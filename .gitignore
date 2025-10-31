@@ -1,0 +1,29 @@
+# =======================================================
+
+# General
+
+# =======================================================
+
+# OS-specific files
+
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE files
+
+.vscode/
+.idea/
+_.swp
+_.swo
+
+# =======================================================
+
+# Data
+
+# =======================================================
+
+# Ignore all CSV files in the data folder, as requested
+
+data/_.csv
+data/_.zip
