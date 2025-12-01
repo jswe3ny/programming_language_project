@@ -7,6 +7,7 @@ import ml.metrics.*;
 import ml.models.*; 
 import ml.preprocess.*; 
 import ml.helpers.*;
+import java.io.IOException;
 
 public class Main {
     static Dataset TRAIN, TEST;
@@ -15,15 +16,15 @@ public class Main {
         ArgParser ap = new ArgParser(args);
         try (Scanner in = new Scanner(System.in)) {
 
-        System.out.println("\nMenu:\n" +
-        "(1) Load data\n" +
-        "(2) Linear Regression (closed-form)\n" +
-        "(3) Logistic Regression (binary)\n" +
-        "(4) k-Nearest Neighbors\n" +
-        "(5) Decision Tree \n" +
-        "(6) Gaussian Naive Bayes6\n" + 
-        "(7) Print general results\n" +
-        "(8) Quit");
+            System.out.println("\nMenu:\n" +
+                    "(1) Load data\n" +
+                    "(2) Linear Regression (closed-form)\n" +
+                    "(3) Logistic Regression (binary)\n" +
+                    "(4) k-Nearest Neighbors\n" +
+                    "(5) Decision Tree \n" +
+                    "(6) Gaussian Naive Bayes\n" + 
+                    "(7) Print general results\n" +
+                    "(8) Quit");
 
 
             while(true){
@@ -42,59 +43,88 @@ public class Main {
     }
 
     private static void loadData(ArgParser ap) throws Exception {
-        String path = ap.get("train", "adult_income_cleaned.csv"); // adjust if needed
+        String path = ap.get("train", "../data/adult_income_cleaned.csv"); // adjust if needed
         boolean normalize = ap.has("normalize");                      // pass --normalize to enable
         System.out.println("Loading "+path+" (normalize="+normalize+") ...");
         long t0 = System.nanoTime();
-        var tt = AdultPipeline.loadClassification(path, "income", normalize, 0.2, 42);
+        Dataset.TrainTest tt = AdultPipeline.loadClassification(path, "income", normalize, 0.2, 42);
         TRAIN = tt.train; TEST = tt.test;
         double secs = (System.nanoTime()-t0)/1e9;
         System.out.printf("Loaded: %d train / %d test / %d features in %.3fs%n",
                 TRAIN.nRows(), TEST.nRows(), TRAIN.nCols(), secs);
     }
 
+    private static void runLinear(ArgParser args) throws IOException {
+        // 1. Required / optional CLI options
+        String trainPath = args.get("train", "../data/adult_income_cleaned.csv");
+        String target = args.get("target", "hours.per.week");
+        boolean normalize = args.has("normalize");
+        double testFrac  = 0.2; // 80/20 split as per spec
 
-    private static void runLinear(ArgParser ap){
-        // Use regression target; default per spec is hours.per.week (sometimes header uses dots)
-        String target = ap.get("target", "hours.per.week");
-        boolean normalize = ap.has("normalize"); // scaling helps a bit here too
-        String path = ap.get("train", "adult_income_cleaned.csv");
-        String srcRoot = ap.get("srcroot", "src");
+        double l2 = args.getDouble("l2", 0.0);
+        long seed = (long) args.getDouble("seed", 42.0);
+
+        System.out.println("\nLinear Regression (closed-form):");
+        System.out.println("********************************");
+        System.out.println("Input option 1: Target variable: " + target);
+        System.out.println("Input option 2: L2 = " + l2);
+
+        // 2. Load regression data (NOT the global classification TRAIN/TEST)
+        Timer t = new Timer();
+        t.start();
+        Dataset.TrainTest tt = AdultPipeline.loadRegression(
+                trainPath,
+                target,
+                normalize,
+                testFrac,
+                seed
+                );
+        double loadSecs = t.seconds();
+        System.out.printf(
+                "Loaded regression dataset in %.3f s (%d train, %d test, %d features)%n",
+                loadSecs,
+                tt.train.X.length,
+                tt.test.X.length,
+                tt.train.featureNames.length
+                );
+
+        // 3. Train Linear Regression
+        LinearRegression model = new LinearRegression(l2);
+
+        t.start();
+        model.fit(tt.train);
+        double trainSecs = t.seconds();
+
+        // 4. Predict and compute *regression* metrics
+        double[] yhat = model.predict(tt.test.X);
+
+        double rmse = Metrics.rmse(tt.test.y, yhat);
+        double r2   = Metrics.r2(tt.test.y, yhat);
+
+        int sloc = SLOC.forClass(LinearRegression.class, ".");
+        System.out.printf("Train time: %.4f s%n", trainSecs);
+        System.out.printf("RMSE: %.4f%n", rmse);
+        System.out.printf("R^2: %.4f%n", r2);
+        System.out.println("SLOC: " + sloc + "\n");
 
 
-        try {
-            var tt = AdultPipeline.loadRegression(path, target, normalize, 0.2, 42);
-            Timer t = new Timer(); t.start();
-            // L2=0 by default; pass --l2 0.001 to try ridge
-            double l2 = ap.getDouble("l2", 0.0);
-            ml.models.LinearRegression m = new ml.models.LinearRegression(l2);
-            m.fit(tt.train);
-            double secs = t.seconds();
-            double[] pred = m.predict(tt.test.X);
-            double acc = Metrics.accuracy(TEST.y, pred);
-            double f1  = Metrics.macroF1(TEST.y, pred);
-            int sloc = SLOC.forClass(LogisticRegression.class, srcRoot);
-
-
-            System.out.println("Algorithm: " + m.name());
-            System.out.printf("Train time: %.4f s%n", secs);
-            System.out.printf("RMSE: %.4f%n", ml.metrics.Metrics.rmse(tt.test.y, pred));
-            System.out.printf("R^2: %.4f%n", ml.metrics.Metrics.r2(tt.test.y, pred));
-            System.out.println("SLOC: " + sloc);
-            log(m.name(), secs, "Accuracy", acc, "Macro-F1", f1, sloc);
-        } catch (Exception e){
-            System.out.println("Linear regression run failed: " + e.getMessage());
-            e.printStackTrace();
-        }
+        // 5. Log results using regression metric names
+        log(
+                model.name(),
+                trainSecs,
+                "RMSE", rmse,
+                "R^2",  r2,
+                sloc
+           );
     }
+
 
     private static void runLogistic(ArgParser ap){
         double lr = ap.getDouble("lr", 0.2);
         int epochs = ap.getInt("epochs", 400);
         double l2 = ap.getDouble("l2", 1e-3);
         long seed = 7;
-        String srcRoot = ap.get("srcroot", "src");
-
+        String srcRoot = ap.get("srcroot", ".");
 
         if (TRAIN==null){ 
             System.out.println("Load data first (option 1)."); 
@@ -109,11 +139,12 @@ public class Main {
         double f1  = Metrics.macroF1(TEST.y, pred);
         int sloc = SLOC.forClass(LogisticRegression.class, srcRoot);
 
-        System.out.println("Algorithm: "+m.name());
+        System.out.println("\nLogistic Regression (closed-form):");
+        System.out.println("********************************");
         System.out.printf("Train time: %.4f s%n", secs);
         System.out.printf("Accuracy: %.4f%n", Metrics.accuracy(TEST.y, pred));
         System.out.printf("Macro-F1: %.4f%n", Metrics.macroF1(TEST.y, pred));
-        System.out.println("SLOC: " + sloc);
+        System.out.println("SLOC: " + sloc + "\n");
         log(m.name(), secs, "Accuracy", acc, "Macro-F1", f1, sloc);
     }
 
@@ -126,7 +157,7 @@ public class Main {
         String distance = ap.get("distance", "euclidean");  // or "manhattan"
         boolean weighted = ap.has("weighted");               // pass --weighted to enable
         String tie = ap.get("tie", "smallest");              // or "random"
-        int sloc = SLOC.forClass(KNN.class, ap.get("srcroot","src"));
+        int sloc = SLOC.forClass(KNN.class, ap.get("srcroot","."));
 
 
         ml.helpers.Timer t = new ml.helpers.Timer(); t.start();
@@ -137,11 +168,12 @@ public class Main {
         double acc = Metrics.accuracy(TEST.y, pred);
         double f1  = Metrics.macroF1(TEST.y, pred);
 
-        System.out.println("Algorithm: " + m.name());
+        System.out.println("\nK-Nearest Neightbors:");
+        System.out.println("********************************");
         System.out.printf("Train time: %.4f s%n", secs); // kNN "train" is just storing data
         System.out.printf("Accuracy: %.4f%n", ml.metrics.Metrics.accuracy(TEST.y, pred));
         System.out.printf("Macro-F1: %.4f%n", ml.metrics.Metrics.macroF1(TEST.y, pred));
-        System.out.println("SLOC: " + sloc);
+        System.out.println("SLOC: " + sloc + "\n");
         log(m.name(), secs, "Accuracy", acc, "Macro-F1", f1, sloc);
     }
 
@@ -158,14 +190,15 @@ public class Main {
         double[] pred = m.predict(TEST.X);
         double acc = Metrics.accuracy(TEST.y, pred);
         double f1  = Metrics.macroF1(TEST.y, pred);
-        int sloc = SLOC.forClass(DecisionTree.class, ap.get("srcroot","src"));
+        int sloc = SLOC.forClass(DecisionTree.class, ap.get("srcroot","."));
 
 
-        System.out.println("Algorithm: " + m.name());
+        System.out.println("\nDecision Tree:");
+        System.out.println("********************************");
         System.out.printf("Train time: %.4f s%n", secs);
         System.out.printf("Accuracy: %.4f%n", Metrics.accuracy(TEST.y, pred));
         System.out.printf("Macro-F1: %.4f%n", Metrics.macroF1(TEST.y, pred));
-        System.out.println("SLOC: " + sloc);
+        System.out.println("SLOC: " + sloc + "\n");
         log(m.name(), secs, "Accuracy", acc, "Macro-F1", f1, sloc);
     }
 
@@ -181,13 +214,14 @@ public class Main {
         double[] pred = m.predict(TEST.X);
         double acc = Metrics.accuracy(TEST.y, pred);
         double f1  = Metrics.macroF1(TEST.y, pred);
-        int sloc = SLOC.forClass(GaussianNaiveBayes.class, ap.get("srcroot","src"));
+        int sloc = SLOC.forClass(GaussianNaiveBayes.class, ap.get("srcroot","."));
 
-        System.out.println("Algorithm: " + m.name());
+        System.out.println("\nGaussian Naive Bayes:");
+        System.out.println("********************************");
         System.out.printf("Train time: %.4f s%n", secs);
         System.out.printf("Accuracy: %.4f%n", Metrics.accuracy(TEST.y, pred));
         System.out.printf("Macro-F1: %.4f%n", Metrics.macroF1(TEST.y, pred));
-        System.out.println("SLOC: " + sloc);
+        System.out.println("SLOC: " + sloc + "\n");
         log(m.name(), secs, "Accuracy", acc, "Macro-F1", f1, sloc);
 
     }
@@ -202,12 +236,38 @@ public class Main {
     static void log(String algo, double secs, String m1n, double m1, String m2n, double m2, int sloc){
         RESULTS.add(new Row("Java", algo, secs, m1n, m1, m2n, m2, sloc));
     }
-    static void printResults(){
+    static void printResults() {
         System.out.println("General Results (Comparison):");
-        System.out.println("Impl     Algo                   TrainTime   Metric1              Metric2              SLOC");
-        for (Row r: RESULTS){
-            System.out.printf("%-8s %-22s %8.4fs   %-10s %-8.4f   %-10s %-8.4f   %5d%n",
-            r.impl, r.algo, r.t, r.m1n, r.m1, r.m2n, r.m2, r.sloc);
+
+        // Nice aligned header
+        System.out.printf(
+                "%-8s %-26s %10s  %-10s %10s  %-10s %10s  %6s%n",
+                "Impl",
+                "Algorithm",
+                "TrainTime",
+                "Metric1",
+                "Value1",
+                "Metric2",
+                "Value2",
+                "SLOC"
+                );
+
+        // Divider line
+        System.out.println("-------------------------------------------------------------------------------------------------------------------");
+
+        // Rows
+        for (Row r : RESULTS) {
+            System.out.printf(
+                    "%-8s %-26s %8.4fs  %-10s %10.4f  %-10s %10.4f  %6d%n",
+                    r.impl,
+                    r.algo,
+                    r.t,
+                    r.m1n, r.m1,
+                    r.m2n, r.m2,
+                    r.sloc
+                    );
         }
     }
+
+
 }

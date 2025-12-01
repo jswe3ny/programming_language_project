@@ -5,200 +5,234 @@ import ml.core.Model;
 
 import java.util.*;
 
-/** ID3 Decision Tree (classification) with numeric features via binning. */
+
 public class DecisionTree implements Model {
 
-    public static class Config {
-        public final int maxDepth, minSamples, nBins;
-        public Config(int maxDepth, int minSamples, int nBins){
-            this.maxDepth = Math.max(1, maxDepth);
-            this.minSamples = Math.max(2, minSamples);
-            this.nBins = Math.max(2, nBins);
-        }
-    }
+    private final int maxDepth;
+    private final int minSamples;
+    private final int nBins;
 
-    private final Config cfg;
     private Node root;
+    private double[][] binEdges;   // [feature][bin boundaries]
 
-    public DecisionTree(int maxDepth, int minSamples, int nBins){
-        this.cfg = new Config(maxDepth, minSamples, nBins);
+    public DecisionTree(int maxDepth, int minSamples, int nBins) {
+        this.maxDepth = maxDepth;
+        this.minSamples = minSamples;
+        this.nBins = nBins;
     }
 
-    @Override public String name(){
-        return "DecisionTree(maxDepth="+cfg.maxDepth+", minSamples="+cfg.minSamples+", bins="+cfg.nBins+")";
+    @Override
+    public String name() { return "DecisionTree(ID3)"; }
+
+    @Override
+    public void fit(Dataset train) {
+        int N = train.X.length;
+        int D = train.X[0].length;
+
+        // Precompute bin edges for each feature (equal-width bins)
+        binEdges = new double[D][nBins + 1];
+        for (int j = 0; j < D; j++) {
+            double min = Double.POSITIVE_INFINITY;
+            double max = Double.NEGATIVE_INFINITY;
+            for (int i = 0; i < N; i++) {
+                double v = train.X[i][j];
+                if (v < min) min = v;
+                if (v > max) max = v;
+            }
+            if (min == max) {
+                Arrays.fill(binEdges[j], min);
+            } else {
+                double step = (max - min) / nBins;
+                for (int b = 0; b <= nBins; b++)
+                    binEdges[j][b] = min + b * step;
+                binEdges[j][nBins] = max; // ensure last boundary exactly max
+            }
+        }
+
+        // Convert all feature values into binned values
+        int[][] Xbin = binAll(train.X);
+
+        int[] rows = new int[N];
+        for (int i = 0; i < N; i++) rows[i] = i;
+
+        this.root = buildTree(Xbin, train.y, rows, 0);
     }
 
-    @Override public void fit(Dataset d){
-        int n = d.nRows(), p = d.nCols();
-        int[] idx = new int[n]; for(int i=0;i<n;i++) idx[i]=i;
-        root = build(d.X, d.y, idx, 0, p);
-    }
+    // ================================================================
+    // Prediction
+    // ================================================================
 
-    @Override public double[] predict(double[][] X){
+    @Override
+    public double[] predict(double[][] X) {
+        int[][] Xb = binAll(X);
         double[] out = new double[X.length];
-        for (int i=0;i<X.length;i++) out[i] = predictOne(root, X[i]);
+        for (int i = 0; i < X.length; i++)
+            out[i] = predictOne(Xb[i], root);
         return out;
     }
 
-    @Override public boolean isClassifier(){ return true; }
-
-    // ---------- Tree internals ----------
-
-    private static class Node {
-        boolean leaf;
-        double label;              // if leaf
-        int feature;               // if internal
-        double[] edges;            // bin edges for the chosen feature
-        Map<Integer, Node> kids;   // bin -> child
+    private double predictOne(int[] xb, Node node) {
+        while (!node.isLeaf) {
+            int feature = node.feature;
+            int b = xb[feature];
+            if (b < node.children.length)
+                node = node.children[b];
+            else
+                node = node.children[node.children.length - 1];
+        }
+        return node.prediction;
     }
 
-    private Node build(double[][] X, double[] y, int[] rows, int depth, int p){
-        Node node = new Node();
+    // ================================================================
+    // Tree Building
+    // ================================================================
 
-        // stopping conditions
-        double maj = majority(y, rows);
-        if (depth >= cfg.maxDepth || rows.length < cfg.minSamples || pure(y, rows)){
-            node.leaf = true; node.label = maj; return node;
-        }
+    private Node buildTree(int[][] X, double[] y, int[] rows, int depth) {
 
-        // find best split among features
-        Best best = bestSplit(X, y, rows, p, cfg.nBins);
-        if (best == null || best.gain <= 1e-12){
-            node.leaf = true; node.label = maj; return node;
-        }
-
-        node.leaf = false;
-        node.feature = best.feature;
-        node.edges = best.edges;
-        node.kids = new HashMap<>();
-
-        // partition rows by bins
-        Map<Integer, List<Integer>> parts = new HashMap<>();
+        // Count class frequencies
+        int count0 = 0, count1 = 0;
         for (int r : rows) {
-            int bin = digitize(X[r][best.feature], best.edges);
-            parts.computeIfAbsent(bin, k -> new ArrayList<>()).add(r);
+            if (y[r] == 1.0) count1++;
+            else count0++;
         }
-        // build children
-        for (var e : parts.entrySet()){
-            int[] childIdx = e.getValue().stream().mapToInt(i->i).toArray();
-            node.kids.put(e.getKey(), build(X, y, childIdx, depth+1, p));
+
+        // Majority vote
+        double majority = (count1 >= count0) ? 1.0 : 0.0;
+
+        // Leaf conditions
+        if (depth >= maxDepth || rows.length < minSamples) {
+            return new Node(true, majority);
         }
+        if (count0 == 0 || count1 == 0) {
+            return new Node(true, majority); // pure leaf
+        }
+
+        // Find best split
+        int bestFeature = -1;
+        double bestGain = -1;
+
+        int D = X[0].length;
+
+        for (int j = 0; j < D; j++) {
+            double gain = informationGain(X, y, rows, j);
+            if (gain > bestGain) {
+                bestGain = gain;
+                bestFeature = j;
+            }
+        }
+
+        if (bestFeature == -1 || bestGain <= 0.0) {
+            return new Node(true, majority);
+        }
+
+        // Split rows by best feature's bin index
+        Map<Integer, List<Integer>> bins = new HashMap<>();
+        for (int r : rows) {
+            int b = X[r][bestFeature];
+            bins.computeIfAbsent(b, k -> new ArrayList<>()).add(r);
+        }
+
+        // Create node
+        Node node = new Node(false, majority);
+        node.feature = bestFeature;
+
+        // Maximum possible bins = nBins
+        node.children = new Node[nBins];
+
+        for (int b = 0; b < nBins; b++) {
+            List<Integer> group = bins.getOrDefault(b, Collections.emptyList());
+            if (group.isEmpty()) {
+                node.children[b] = new Node(true, majority);
+            } else {
+                int[] subrows = group.stream().mapToInt(i -> i).toArray();
+                node.children[b] = buildTree(X, y, subrows, depth + 1);
+            }
+        }
+
         return node;
     }
 
-    private double predictOne(Node node, double[] x){
-        Node cur = node;
-        while (!cur.leaf){
-            int bin = digitize(x[cur.feature], cur.edges);
-            Node nxt = cur.kids.get(bin);
-            if (nxt == null) { // unseen bin → backoff: majority at this node
-                // walk to a child with largest population if available
-                // (kids’ leaves will have majority labels)
-                double fallback = 0.0; boolean set=false;
-                for (Node c : cur.kids.values()){
-                    if (c.leaf){ fallback = c.label; set=true; break; }
-                }
-                return set ? fallback : 0.0;
+    // ================================================================
+    // Information Gain
+    // ================================================================
+
+    private double informationGain(int[][] X, double[] y, int[] rows, int feature) {
+        double parentEntropy = entropy(y, rows);
+
+        // Partition child groups
+        Map<Integer, List<Integer>> bins = new HashMap<>();
+        for (int r : rows) {
+            int b = X[r][feature];
+            bins.computeIfAbsent(b, k -> new ArrayList<>()).add(r);
+        }
+
+        double weightedEntropy = 0;
+        int N = rows.length;
+
+        for (java.util.Map.Entry<Integer, List<Integer>> entry : bins.entrySet()) {    
+            int[] sub = entry.getValue().stream().mapToInt(i -> i).toArray();
+            weightedEntropy += (sub.length / (double) N) * entropy(y, sub);
+        }
+
+        return parentEntropy - weightedEntropy;
+    }
+
+    private double entropy(double[] y, int[] rows) {
+        if (rows.length == 0) return 0.0;
+
+        double count0 = 0, count1 = 0;
+        for (int r : rows) {
+            if (y[r] == 1.0) count1++;
+            else count0++;
+        }
+
+        double p0 = count0 / rows.length;
+        double p1 = count1 / rows.length;
+
+        double h = 0;
+        if (p0 > 0) h -= p0 * Math.log(p0) / Math.log(2);
+        if (p1 > 0) h -= p1 * Math.log(p1) / Math.log(2);
+        return h;
+    }
+
+    // ================================================================
+    // Binning
+    // ================================================================
+
+    private int[][] binAll(double[][] X) {
+        int N = X.length, D = X[0].length;
+        int[][] out = new int[N][D];
+
+        for (int j = 0; j < D; j++) {
+            double[] edges = binEdges[j];
+
+            for (int i = 0; i < N; i++) {
+                double v = X[i][j];
+
+                int b = 0;
+                while (b < nBins && v > edges[b + 1]) b++;
+
+                if (b >= nBins) b = nBins - 1;
+                out[i][j] = b;
             }
-            cur = nxt;
         }
-        return cur.label;
+
+        return out;
     }
 
-    // ---------- Splitting utilities ----------
+    // ================================================================
+    // Node class
+    // ================================================================
 
-    private static boolean pure(double[] y, int[] rows){
-        double f = y[rows[0]];
-        for (int r : rows) if (y[r] != f) return false;
-        return true;
-    }
+    private static class Node {
+        boolean isLeaf;
+        double prediction; // used only if leaf
+        int feature;       // index of split feature
+        Node[] children;   // child nodes for each bin
 
-    private static double majority(double[] y, int[] rows){
-        Map<Double,Integer> cnt = new HashMap<>();
-        for (int r: rows) cnt.merge(y[r], 1, Integer::sum);
-        double best = 0; int bc = -1;
-        for (var e: cnt.entrySet()){
-            if (e.getValue() > bc) { bc = e.getValue(); best = e.getKey(); }
+        Node(boolean isLeaf, double pred) {
+            this.isLeaf = isLeaf;
+            this.prediction = pred;
         }
-        return best;
     }
-
-    private static class Best { int feature; double[] edges; double gain; }
-
-    private Best bestSplit(double[][] X, double[] y, int[] rows, int p, int nBins){
-        double baseH = entropy(y, rows);
-        Best best = null;
-
-        for (int j=0;j<p;j++){
-            double[] col = new double[rows.length];
-            for (int t=0;t<rows.length;t++) col[t] = X[rows[t]][j];
-
-            double[] edges = histogramEdges(col, nBins);
-            // assign bins
-            int[] bins = new int[rows.length];
-            for (int t=0;t<rows.length;t++) bins[t] = digitize(col[t], edges);
-
-            double g = informationGain(y, rows, bins);
-            if (g > 0){
-                double gain = baseH - (baseH - g); // (equivalently just g)
-                if (best == null || gain > best.gain){
-                    best = new Best(); best.feature = j; best.edges = edges; best.gain = gain;
-                }
-            }
-        }
-        return best;
-    }
-
-    private static double entropy(double[] y, int[] rows){
-        Map<Double,Integer> cnt = new HashMap<>();
-        for (int r: rows) cnt.merge(y[r], 1, Integer::sum);
-        double n = rows.length, H = 0.0;
-        for (int c: cnt.values()){
-            double p = c / n;
-            H += -p * log2(p);
-        }
-        return H;
-    }
-
-    private static double informationGain(double[] y, int[] rows, int[] bins){
-        // IG = H(Y) - sum_v p(v) * H(Y|v)
-        double H = entropy(y, rows);
-        Map<Integer, List<Integer>> byV = new HashMap<>();
-        for (int i=0;i<rows.length;i++){
-            byV.computeIfAbsent(bins[i], k->new ArrayList<>()).add(rows[i]);
-        }
-        double cond = 0.0, n = rows.length;
-        for (var e: byV.entrySet()){
-            int[] subset = e.getValue().stream().mapToInt(k->k).toArray();
-            cond += (subset.length / n) * entropy(y, subset);
-        }
-        return H - cond;
-    }
-
-    private static double[] histogramEdges(double[] col, int bins){
-        double min = Double.POSITIVE_INFINITY, max = Double.NEGATIVE_INFINITY;
-        for (double v: col){ if (v<min) min=v; if (v>max) max=v; }
-        if (min==max){ // constant column; make a single split edge to produce one bin
-            return new double[]{min};
-        }
-        double[] edges = new double[bins+1];
-        double step = (max - min) / bins;
-        for (int i=0;i<=bins;i++) edges[i] = min + i*step;
-        return edges;
-    }
-
-    /** Return 1..bins index like numpy.digitize (right-closed). */
-    private static int digitize(double v, double[] edges){
-        // edges length = bins+1
-        if (v <= edges[0]) return 1;
-        if (v >= edges[edges.length-1]) return edges.length; // last bin index = bins+1
-        int lo = 0, hi = edges.length-1;
-        while (lo+1 < hi){
-            int mid = (lo+hi)/2;
-            if (v <= edges[mid]) hi = mid; else lo = mid;
-        }
-        return hi; // 1..bins
-    }
-
-    private static double log2(double x){ return Math.log(x + 1e-12) / Math.log(2.0); }
 }

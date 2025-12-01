@@ -11,7 +11,7 @@ public class LinearRegression implements Model {
 
     public LinearRegression(double l2){ this.l2 = Math.max(0.0, l2); }
 
-    @Override public String name(){ return "LinearRegression(CF, l2="+l2+")"; }
+    @Override public String name(){ return "LinearRegression(l2="+l2+")"; }
     @Override public boolean isClassifier(){ return false; }
 
     @Override public void fit(Dataset d){
@@ -24,7 +24,6 @@ public class LinearRegression implements Model {
             Xa[i][p] = 1.0; // bias column
         }
 
-        // Build (XᵀX + λI*) and Xᵀy
         double[][] XtX = new double[p+1][p+1];
         double[]   Xty = new double[p+1];
 
