@@ -12,7 +12,6 @@
 
 (defun knn (x-train y-train test-row k)
   "Predicts the class (0 or 1) for a single test-row."  
-  ;; gets distances from test-row to other training rows
   (let* ((distances (mapcar #'(lambda (train-row)
                                 (euclidean-distance test-row train-row))
                             x-train))
