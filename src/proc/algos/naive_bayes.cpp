@@ -20,7 +20,6 @@ GaussianNBModel gaussian_nb_fit(const Matrix& X, const Vector& y,
     int n = X.size();
     int d = X[0].size();
 
-    // Normalize prior override if provided
     std::map<double, double> normalized_priors;
     if (!config.prior_override.empty()) {
         double sum = 0.0;
@@ -43,7 +42,6 @@ GaussianNBModel gaussian_nb_fit(const Matrix& X, const Vector& y,
 
     // Compute statistics for each class
     for (double c : model.classes) {
-        // Gather samples for this class
         Matrix X_c;
         for (int i = 0; i < n; i++) {
             if (std::abs(y[i] - c) < 1e-9) {
@@ -53,14 +51,12 @@ GaussianNBModel gaussian_nb_fit(const Matrix& X, const Vector& y,
 
         int n_c = X_c.size();
 
-        // Prior probability
         if (!normalized_priors.empty() && normalized_priors.count(c) > 0) {
             model.priors[c] = normalized_priors[c];
         } else {
             model.priors[c] = (double)n_c / n;
         }
 
-        // Compute mean for each feature
         Vector means(d, 0.0);
         for (int j = 0; j < d; j++) {
             for (int i = 0; i < n_c; i++) {
@@ -70,7 +66,6 @@ GaussianNBModel gaussian_nb_fit(const Matrix& X, const Vector& y,
         }
         model.means[c] = means;
 
-        // Compute variance for each feature
         Vector vars(d, 0.0);
         for (int j = 0; j < d; j++) {
             for (int i = 0; i < n_c; i++) {

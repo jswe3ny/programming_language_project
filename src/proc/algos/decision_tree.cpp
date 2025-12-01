@@ -91,17 +91,15 @@ BestSplit find_best_split(const Matrix& X, const Vector& y, int n_bins) {
     int d = X[0].size();
     
     for (int j = 0; j < d; j++) {
-        // Extract column
+        // column
         Vector col(n);
         for (int i = 0; i < n; i++) {
             col[i] = X[i][j];
         }
-        
-        // Compute bin edges
+
         std::vector<double> edges = compute_bin_edges(col, n_bins);
         Vector bins = digitize(col, edges);
-        
-        // Compute information gain
+
         double gain = information_gain(y, bins);
         
         if (gain > best.gain) {
@@ -139,8 +137,7 @@ std::shared_ptr<TreeNode> decision_tree_fit_recursive(
     int depth, const DecisionTreeConfig& config) {
     
     auto node = std::make_shared<TreeNode>();
-    
-    // Stopping conditions
+
     std::set<double> unique_labels(y.begin(), y.end());
     if (depth >= config.max_depth || 
         unique_labels.size() == 1 || 
@@ -149,8 +146,7 @@ std::shared_ptr<TreeNode> decision_tree_fit_recursive(
         node->label = majority_label(y);
         return node;
     }
-    
-    // Find best split
+
     BestSplit split = find_best_split(X, y, config.n_bins);
     
     if (split.feature == -1 || split.bin_edges.empty()) {
@@ -158,15 +154,14 @@ std::shared_ptr<TreeNode> decision_tree_fit_recursive(
         node->label = majority_label(y);
         return node;
     }
-    
-    // Extract feature column and discretize
+
     int n = X.size();
     Vector col(n);
     for (int i = 0; i < n; i++) {
-        col[i] = X[split.feature][i];
+        col[i] = X[i][split.feature];
     }
     Vector bins = digitize(col, split.bin_edges);
-    
+
     // Partition data by bin
     std::map<int, std::pair<Matrix, Vector>> partitions;
     for (int i = 0; i < n; i++) {
@@ -174,7 +169,7 @@ std::shared_ptr<TreeNode> decision_tree_fit_recursive(
         partitions[bin].first.push_back(X[i]);
         partitions[bin].second.push_back(y[i]);
     }
-    
+
     // Build children recursively
     node->is_leaf = false;
     node->feature = split.feature;
@@ -201,8 +196,7 @@ double predict_one(const Vector& x, const std::shared_ptr<TreeNode>& node) {
     if (node->is_leaf) {
         return node->label;
     }
-    
-    // Discretize feature value
+
     double val = x[node->feature];
     int bin = 0;
     for (size_t i = 0; i < node->bin_edges.size() - 1; i++) {
@@ -214,11 +208,9 @@ double predict_one(const Vector& x, const std::shared_ptr<TreeNode>& node) {
     if (val >= node->bin_edges.back() - 1e-10) {
         bin = node->bin_edges.size() - 2;
     }
-    
-    // Follow appropriate child
+
     auto it = node->children.find(bin);
     if (it == node->children.end()) {
-        // Fallback if bin not seen during training
         return node->children.begin()->second->label;
     }
     

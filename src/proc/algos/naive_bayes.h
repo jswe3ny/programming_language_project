@@ -16,14 +16,12 @@ struct GaussianNBModel {
 
 struct GaussianNBConfig {
     double var_smoothing = 1e-9;
-    std::map<double, double> prior_override;  // Optional: custom class priors
+    std::map<double, double> prior_override;
 };
 
-// Fit Gaussian Naive Bayes model
 GaussianNBModel gaussian_nb_fit(const Matrix& X, const Vector& y,
                                const GaussianNBConfig& config = GaussianNBConfig());
 
-// Predict class labels
 Vector gaussian_nb_predict(const Matrix& X, const GaussianNBModel& model);
 
-#endif // NAIVE_BAYES_H
+#endif

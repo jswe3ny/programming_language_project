@@ -19,15 +19,12 @@ struct LogisticConfig {
     bool verbose = false;
 };
 
-// Fit logistic regression using gradient descent
 LogisticModel logistic_regression_fit(const Matrix& X, const Vector& y,
                                      const LogisticConfig& config = LogisticConfig());
 
-// Predict class labels (0 or 1)
 Vector logistic_regression_predict(const Matrix& X, const LogisticModel& model,
                                    double threshold = 0.5);
 
-// Predict probabilities
 Vector logistic_regression_predict_proba(const Matrix& X, const LogisticModel& model);
 
-#endif // LOGISTIC_REGRESSION_H
+#endif

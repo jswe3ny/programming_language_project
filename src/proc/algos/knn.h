@@ -25,8 +25,7 @@ struct KNNConfig {
     double eps = 1e-12;
 };
 
-// k-NN prediction (lazy learning - no training phase)
 Vector knn_predict(const Matrix& X_train, const Vector& y_train,
                   const Matrix& X_test, const KNNConfig& config = KNNConfig());
 
-#endif // KNN_H
+#endif

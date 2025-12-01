@@ -60,20 +60,17 @@ double rmse(const Vector& y_true, const Vector& y_pred) {
 
 double r2_score(const Vector& y_true, const Vector& y_pred) {
     if (y_true.size() != y_pred.size() || y_true.empty()) return 0.0;
-    
-    // Compute mean
+
     double mean = 0.0;
     for (double y : y_true) mean += y;
     mean /= y_true.size();
-    
-    // Total sum of squares
+
     double sst = 0.0;
     for (double y : y_true) {
         double diff = y - mean;
         sst += diff * diff;
     }
-    
-    // Residual sum of squares
+
     double ssr = 0.0;
     for (size_t i = 0; i < y_true.size(); i++) {
         double diff = y_true[i] - y_pred[i];

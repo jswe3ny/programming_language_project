@@ -2,7 +2,7 @@
 #include <cmath>
 #include <stdexcept>
 
-// Helper: Matrix multiplication C = A * B
+// Matrix multiplication C = A * B
 Matrix mat_mult(const Matrix& A, const Matrix& B) {
     int m = A.size();
     int n = B[0].size();
@@ -19,7 +19,7 @@ Matrix mat_mult(const Matrix& A, const Matrix& B) {
     return C;
 }
 
-// Helper: Matrix transpose
+// Matrix transpose
 Matrix mat_transpose(const Matrix& A) {
     if (A.empty()) return Matrix();
     int m = A.size();
@@ -33,15 +33,13 @@ Matrix mat_transpose(const Matrix& A) {
     return At;
 }
 
-// Helper: Matrix inverse using Gauss-Jordan elimination
+// Matrix inverse using Gauss-Jordan elimination (from google)
 Matrix mat_inverse(Matrix A) {
     int n = A.size();
     Matrix I(n, Vector(n, 0.0));
     for (int i = 0; i < n; i++) I[i][i] = 1.0;
-    
-    // Gauss-Jordan elimination
+
     for (int i = 0; i < n; i++) {
-        // Find pivot
         double max_val = std::abs(A[i][i]);
         int max_row = i;
         for (int k = i + 1; k < n; k++) {
@@ -50,14 +48,12 @@ Matrix mat_inverse(Matrix A) {
                 max_row = k;
             }
         }
-        
-        // Swap rows
+
         if (max_row != i) {
             std::swap(A[i], A[max_row]);
             std::swap(I[i], I[max_row]);
         }
-        
-        // Scale pivot row
+
         double pivot = A[i][i];
         if (std::abs(pivot) < 1e-10) pivot = 1e-10;
         
@@ -65,8 +61,7 @@ Matrix mat_inverse(Matrix A) {
             A[i][j] /= pivot;
             I[i][j] /= pivot;
         }
-        
-        // Eliminate column
+
         for (int k = 0; k < n; k++) {
             if (k != i) {
                 double factor = A[k][i];
@@ -84,22 +79,20 @@ Matrix mat_inverse(Matrix A) {
 LinearModel linear_regression_fit(const Matrix& X, const Vector& y, double l2) {
     int n = X.size();
     int d = X[0].size();
-    
-    // Augment X with bias column
+
     Matrix X_aug(n, Vector(d + 1));
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < d; j++) {
             X_aug[i][j] = X[i][j];
         }
-        X_aug[i][d] = 1.0;  // bias term
+        X_aug[i][d] = 1.0;
     }
     
     // Compute X^T * X
     Matrix Xt = mat_transpose(X_aug);
     Matrix XtX = mat_mult(Xt, X_aug);
-    
-    // Add L2 regularization (don't regularize bias)
-    for (int i = 0; i < d; i++) {  // Only features, not bias
+
+    for (int i = 0; i < d; i++) {
         XtX[i][i] += l2;
     }
     
@@ -121,8 +114,7 @@ LinearModel linear_regression_fit(const Matrix& X, const Vector& y, double l2) {
             w_aug[i] += XtX_inv[i][j] * Xty[j];
         }
     }
-    
-    // Separate weights and bias
+
     LinearModel model;
     model.weights.resize(d);
     for (int i = 0; i < d; i++) {

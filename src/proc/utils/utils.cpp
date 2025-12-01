@@ -42,16 +42,13 @@ Dataset load_csv(const std::string& path, const std::string& target_col) {
         throw std::runtime_error("Cannot open file: " + path);
     }
 
-    Dataset ds;
     std::string line;
     std::vector<std::string> headers;
 
-    // Read header
     if (std::getline(file, line)) {
         headers = parse_csv_line(line);
     }
 
-    // Find target column
     int target_idx = -1;
     for (size_t i = 0; i < headers.size(); i++) {
         if (headers[i] == target_col) {
@@ -63,14 +60,6 @@ Dataset load_csv(const std::string& path, const std::string& target_col) {
         throw std::runtime_error("Target column not found: " + target_col);
     }
 
-    // Store feature names (excluding target)
-    for (size_t i = 0; i < headers.size(); i++) {
-        if (static_cast<int>(i) != target_idx) {
-            ds.feature_names.push_back(headers[i]);
-        }
-    }
-
-    // Read rows (features as strings, target as strings)
     std::vector<std::vector<std::string>> raw_data;
     std::vector<std::string> target_data;
 
@@ -79,8 +68,6 @@ Dataset load_csv(const std::string& path, const std::string& target_col) {
         if (values.size() != headers.size()) continue;
 
         std::vector<std::string> row;
-        row.reserve(headers.size() - 1);
-
         for (size_t i = 0; i < values.size(); i++) {
             if (static_cast<int>(i) == target_idx) {
                 target_data.push_back(values[i]);
@@ -91,9 +78,10 @@ Dataset load_csv(const std::string& path, const std::string& target_col) {
         raw_data.push_back(std::move(row));
     }
 
-    // Detect which feature columns are numeric
-    const int n_features = static_cast<int>(ds.feature_names.size());
+    // Detect numeric vs categorical columns
+    const int n_features = static_cast<int>(headers.size()) - 1;
     std::vector<bool> is_numeric(n_features, true);
+    std::vector<std::set<std::string>> unique_values(n_features);
 
     auto is_fully_numeric = [](const std::string& s) -> bool {
         try {
@@ -107,31 +95,55 @@ Dataset load_csv(const std::string& path, const std::string& target_col) {
         for (const auto& row : raw_data) {
             if (!is_fully_numeric(row[j])) {
                 is_numeric[j] = false;
-                break;
+            }
+            unique_values[j].insert(row[j]);
+        }
+    }
+
+    // one-hot encode
+    std::vector<std::string> encoded_feature_names;
+    std::vector<std::map<std::string, int>> category_maps(n_features);
+
+    int total_features = 0;
+    for (int j = 0; j < n_features; j++) {
+        if (is_numeric[j]) {
+            encoded_feature_names.push_back(headers[j < target_idx ? j : j + 1]);
+            total_features++;
+        } else {
+            int col_idx = 0;
+            for (const auto& val : unique_values[j]) {
+                std::string feat_name = headers[j < target_idx ? j : j + 1] + "_" + val;
+                encoded_feature_names.push_back(feat_name);
+                category_maps[j][val] = col_idx++;
+                total_features++;
             }
         }
     }
 
-    // Convert features: numeric -> double, non-numeric -> 0.0 (placeholder)
-    // (Keeps current behavior for features; change to one-hot later if desired.)
-    ds.X.resize(raw_data.size());
+    Dataset ds;
+    ds.feature_names = encoded_feature_names;
+    ds.X.resize(raw_data.size(), Vector(total_features, 0.0));
+
     for (size_t i = 0; i < raw_data.size(); i++) {
-        ds.X[i].resize(n_features);
+        int out_col = 0;
         for (int j = 0; j < n_features; j++) {
             if (is_numeric[j]) {
                 try {
-                    ds.X[i][j] = std::stod(raw_data[i][j]);
+                    ds.X[i][out_col++] = std::stod(raw_data[i][j]);
                 } catch (...) {
-                    ds.X[i][j] = 0.0;
+                    ds.X[i][out_col++] = 0.0;
                 }
             } else {
-                ds.X[i][j] = 0.0; // placeholder for categorical (consistent with your current code)
+                int cat_col = category_maps[j][raw_data[i][j]];
+                int num_categories = unique_values[j].size();
+                for (int k = 0; k < num_categories; k++) {
+                    ds.X[i][out_col + k] = (k == cat_col) ? 1.0 : 0.0;
+                }
+                out_col += num_categories;
             }
         }
     }
 
-    // ----- FIXED TARGET PARSING -----
-    // Decide if the target column is numeric across the dataset
     bool target_is_numeric = true;
     for (const auto& s : target_data) {
         if (!is_fully_numeric(s)) {
@@ -141,9 +153,7 @@ Dataset load_csv(const std::string& path, const std::string& target_col) {
     }
 
     ds.y.resize(target_data.size());
-
     if (target_is_numeric) {
-        // Numeric target (e.g., "hours.per.week")
         for (size_t i = 0; i < target_data.size(); i++) {
             try {
                 ds.y[i] = std::stod(target_data[i]);
@@ -152,38 +162,7 @@ Dataset load_csv(const std::string& path, const std::string& target_col) {
             }
         }
     } else {
-        // Categorical target. First try your Adult Income mapping.
-        // If it doesn't match that pattern, fall back to a generic label map.
-        // (This keeps things robust for other datasets.)
-        auto lower_nospace_nodot = [](std::string t) {
-            std::transform(t.begin(), t.end(), t.begin(), ::tolower);
-            t.erase(std::remove(t.begin(), t.end(), '.'), t.end());
-            t.erase(std::remove(t.begin(), t.end(), ' '), t.end());
-            return t;
-        };
-
-        bool looks_like_adult_income = true;
-        for (const auto& s : target_data) {
-            auto t = lower_nospace_nodot(s);
-            if (!(t == "<=50k" || t == ">50k")) {
-                looks_like_adult_income = false;
-                break;
-            }
-        }
-
-        if (looks_like_adult_income) {
-            // Uses your existing helper
-            ds.y = map_income_to_binary(target_data);
-        } else {
-            // Generic categorical mapping to 0..K-1
-            std::unordered_map<std::string, int> labmap;
-            int next = 0;
-            for (size_t i = 0; i < target_data.size(); i++) {
-                std::string key = lower_nospace_nodot(target_data[i]);
-                if (!labmap.count(key)) labmap[key] = next++;
-                ds.y[i] = static_cast<double>(labmap[key]);
-            }
-        }
+        ds.y = map_income_to_binary(target_data);
     }
 
     return ds;
@@ -224,7 +203,6 @@ NormStats zscore_normalize(Matrix& X, const NormStats* existing) {
         stats.means = existing->means;
         stats.stds = existing->stds;
     } else {
-        // Compute means
         for (int j = 0; j < d; j++) {
             double sum = 0.0;
             for (int i = 0; i < n; i++) {
@@ -233,19 +211,23 @@ NormStats zscore_normalize(Matrix& X, const NormStats* existing) {
             stats.means[j] = sum / n;
         }
         
-        // Compute stds
+        // Compute stds (SAMPLE standard deviation to match pandas default)
         for (int j = 0; j < d; j++) {
             double sum_sq = 0.0;
             for (int i = 0; i < n; i++) {
                 double diff = X[i][j] - stats.means[j];
                 sum_sq += diff * diff;
             }
-            stats.stds[j] = std::sqrt(sum_sq / n);
+            // Use n-1 for sample std (ddof=1) to match pandas
+            if (n > 1) {
+                stats.stds[j] = std::sqrt(sum_sq / (n - 1));
+            } else {
+                stats.stds[j] = 1.0;
+            }
             if (stats.stds[j] < 1e-8) stats.stds[j] = 1.0;
         }
     }
-    
-    // Apply normalization
+
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < d; j++) {
             X[i][j] = (X[i][j] - stats.means[j]) / stats.stds[j];

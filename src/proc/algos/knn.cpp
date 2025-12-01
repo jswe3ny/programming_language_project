@@ -31,10 +31,6 @@ Vector knn_predict(const Matrix& X_train, const Vector& y_train,
     const int n_train = X_train.size();
     Vector predictions(n_test);
 
-    // Pre-allocate distance buffers
-    std::vector<double> dists(n_train);
-    std::vector<double> labels(n_train);
-
     std::mt19937 rng(config.seed);
     auto metric = (config.distance == DistanceMetric::EUCLIDEAN)
         ? euclidean_distance
@@ -43,30 +39,28 @@ Vector knn_predict(const Matrix& X_train, const Vector& y_train,
     for (int i = 0; i < n_test; i++) {
         const auto& x = X_test[i];
 
-        // Compute all distances
+        std::vector<std::pair<double, double>> dist_label_pairs(n_train);
+        
         for (int j = 0; j < n_train; j++) {
-            dists[j] = metric(x, X_train[j]);
-            labels[j] = y_train[j];
+            dist_label_pairs[j] = {metric(x, X_train[j]), y_train[j]};
         }
 
-        // nth_element places the k smallest distances at the front (unordered)
         int k = std::min(config.k, n_train);
         std::nth_element(
-            dists.begin(),
-            dists.begin() + k,
-            dists.end(),
-            [&](double a, double b){ return a < b; }
+            dist_label_pairs.begin(),
+            dist_label_pairs.begin() + k,
+            dist_label_pairs.end(),
+            [](const auto& a, const auto& b) { return a.first < b.first; }
         );
 
-        // Sort only the first k items to align with labels
-        std::vector<std::pair<double,double>> neighbors(k);
-        for (int j = 0; j < k; j++)
-            neighbors[j] = {dists[j], labels[j]};
-
+        std::vector<std::pair<double, double>> neighbors(
+            dist_label_pairs.begin(),
+            dist_label_pairs.begin() + k
+        );
+        
         std::sort(neighbors.begin(), neighbors.end(),
-                  [](auto &a, auto &b){ return a.first < b.first; });
+                  [](const auto& a, const auto& b) { return a.first < b.first; });
 
-        // Vote
         std::unordered_map<double, double> score;
         score.reserve(k);
 
@@ -87,7 +81,7 @@ Vector knn_predict(const Matrix& X_train, const Vector& y_train,
 
         std::vector<double> tied;
 
-        for (auto& kv : score) {
+        for (const auto& kv : score) {
             double label = kv.first;
             double s = kv.second;
 

@@ -5,7 +5,7 @@
 #include <iostream>
 
 double sigmoid(double z) {
-    z = std::max(-500.0, std::min(500.0, z));  // Clip for numerical stability
+    z = std::max(-500.0, std::min(500.0, z));
     return 1.0 / (1.0 + std::exp(-z));
 }
 
@@ -13,8 +13,7 @@ LogisticModel logistic_regression_fit(const Matrix& X, const Vector& y,
                                      const LogisticConfig& config) {
     int n = X.size();
     int d = X[0].size();
-    
-    // Initialize weights and bias
+
     std::mt19937 rng(config.seed);
     std::normal_distribution<double> dist(0.0, 0.01);
     
@@ -24,10 +23,8 @@ LogisticModel logistic_regression_fit(const Matrix& X, const Vector& y,
         model.weights[j] = dist(rng);
     }
     model.bias = 0.0;
-    
-    // Gradient descent
+
     for (int epoch = 0; epoch < config.epochs; epoch++) {
-        // Forward pass: compute predictions
         Vector predictions(n);
         for (int i = 0; i < n; i++) {
             double z = model.bias;
@@ -36,8 +33,7 @@ LogisticModel logistic_regression_fit(const Matrix& X, const Vector& y,
             }
             predictions[i] = sigmoid(z);
         }
-        
-        // Compute gradients
+
         Vector grad_w(d, 0.0);
         double grad_b = 0.0;
         
@@ -48,20 +44,17 @@ LogisticModel logistic_regression_fit(const Matrix& X, const Vector& y,
                 grad_w[j] += error * X[i][j];
             }
         }
-        
-        // Average and add L2 regularization
+
         for (int j = 0; j < d; j++) {
             grad_w[j] = grad_w[j] / n + config.l2 * model.weights[j];
         }
         grad_b /= n;
-        
-        // Update parameters
+
         for (int j = 0; j < d; j++) {
             model.weights[j] -= config.learning_rate * grad_w[j];
         }
         model.bias -= config.learning_rate * grad_b;
-        
-        // Optional: print progress
+
         if (config.verbose && (epoch % 50 == 0 || epoch == config.epochs - 1)) {
             double loss = 0.0;
             for (int i = 0; i < n; i++) {
