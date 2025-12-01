@@ -1,0 +1,58 @@
+FOR ODIN
+
+1) Compile the Java OOP implementation
+
+Run from:
+
+cd .../programming_language_project/src/oop-java
+
+
+Compile:
+
+javac $(find . -name "*.java")
+
+
+No output = success
+
+This compiles all app and ml packages.
+
+2)  Run the menu (standard run)
+
+Still from:
+
+cd .../programming_language_project/src/oop-java
+
+
+Run:
+
+java app.Main --train ../data/adult_income_cleaned.csv
+
+
+Then use the menu:
+
+1  Load data
+
+2  Linear Regression
+
+3  Logistic Regression
+
+4  k-NN
+
+5  Decision Tree
+
+6  Gaussian Naive Bayes
+
+7  Print general results
+
+8  Quit
+
+3) Alternative: run from project root (optional, but not recommended)
+
+If you prefer to always run from the project root, you can do:
+
+cd .../programming_language_project
+javac $(find src/oop-java -name "*.java")
+
+java -cp src/oop-java app.Main \
+  --train src/data/adult_income_cleaned.csv
+  --srcroot src/oop-java
