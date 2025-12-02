@@ -61,7 +61,7 @@ public class Main {
         boolean normalize = args.has("normalize");
         double testFrac  = 0.2; // 80/20 split as per spec
 
-        double l2 = args.getDouble("l2", 0.0);
+        double l2 = args.getDouble("l2", 1.0);
         long seed = (long) args.getDouble("seed", 42.0);
 
         System.out.println("\nLinear Regression (closed-form):");
@@ -120,9 +120,9 @@ public class Main {
 
 
     private static void runLogistic(ArgParser ap){
-        double lr = ap.getDouble("lr", 0.2);
-        int epochs = ap.getInt("epochs", 400);
-        double l2 = ap.getDouble("l2", 1e-3);
+        double lr = ap.getDouble("lr", 0.001);
+        int epochs = ap.getInt("epochs", 3000);
+        double l2 = ap.getDouble("l2", 1.0);
         long seed = 7;
         String srcRoot = ap.get("srcroot", ".");
 
@@ -141,6 +141,9 @@ public class Main {
 
         System.out.println("\nLogistic Regression (closed-form):");
         System.out.println("********************************");
+        System.out.println("Input option 1: Lr = " + lr);
+        System.out.println("Input option 2: epoch = " + epochs);
+        System.out.println("Input option 3: L2 = " + l2);
         System.out.printf("Train time: %.4f s%n", secs);
         System.out.printf("Accuracy: %.4f%n", Metrics.accuracy(TEST.y, pred));
         System.out.printf("Macro-F1: %.4f%n", Metrics.macroF1(TEST.y, pred));
@@ -153,7 +156,7 @@ public class Main {
             System.out.println("Load data first (option 1)."); 
             return; 
         }
-        int k = ap.getInt("k", 7);
+        int k = ap.getInt("k", 15);
         String distance = ap.get("distance", "euclidean");  // or "manhattan"
         boolean weighted = ap.has("weighted");               // pass --weighted to enable
         String tie = ap.get("tie", "smallest");              // or "random"
@@ -170,6 +173,7 @@ public class Main {
 
         System.out.println("\nK-Nearest Neightbors:");
         System.out.println("********************************");
+        System.out.println("K = " + k);
         System.out.printf("Train time: %.4f s%n", secs); // kNN "train" is just storing data
         System.out.printf("Accuracy: %.4f%n", ml.metrics.Metrics.accuracy(TEST.y, pred));
         System.out.printf("Macro-F1: %.4f%n", ml.metrics.Metrics.macroF1(TEST.y, pred));
@@ -195,6 +199,9 @@ public class Main {
 
         System.out.println("\nDecision Tree:");
         System.out.println("********************************");
+        System.out.println("max_depth = " + maxDepth);
+        System.out.println("min_samples = " + minSamples);
+        System.out.println("bins = " + nBins);
         System.out.printf("Train time: %.4f s%n", secs);
         System.out.printf("Accuracy: %.4f%n", Metrics.accuracy(TEST.y, pred));
         System.out.printf("Macro-F1: %.4f%n", Metrics.macroF1(TEST.y, pred));
@@ -205,7 +212,7 @@ public class Main {
 
     private static void runGNB(ArgParser ap){
         if (TRAIN==null){ System.out.println("Load data first (option 1)."); return; }
-        double smooth = ap.getDouble("smoothing", 1e-9);   // --smoothing 1e-8, etc.
+        double smooth = ap.getDouble("smoothing", 1e-1);   // --smoothing 1e-8, etc.
 
         Timer t = new Timer(); t.start();
         ml.models.GaussianNaiveBayes m = new ml.models.GaussianNaiveBayes(smooth);
@@ -218,6 +225,7 @@ public class Main {
 
         System.out.println("\nGaussian Naive Bayes:");
         System.out.println("********************************");
+        System.out.println("Smoothing = " + smooth);
         System.out.printf("Train time: %.4f s%n", secs);
         System.out.printf("Accuracy: %.4f%n", Metrics.accuracy(TEST.y, pred));
         System.out.printf("Macro-F1: %.4f%n", Metrics.macroF1(TEST.y, pred));

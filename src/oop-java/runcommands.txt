@@ -24,8 +24,8 @@ cd .../programming_language_project/src/oop-java
 
 
 Run:
-
-java app.Main --train ../data/adult_income_cleaned.csv
+run with or without -- normalize to get different results. 
+java app.Main --train ../data/adult_income_cleaned.csv --normalize
 
 
 Then use the menu:
