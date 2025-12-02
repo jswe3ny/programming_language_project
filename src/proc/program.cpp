@@ -121,20 +121,36 @@ int main(int argc, char* argv[]) {
     try {
         CliConfig config = parse_args(argc, argv);
 
-        Dataset train_data = load_csv(config.train_path, config.target_name);
-        if (train_data.X.empty()) {
-            throw std::runtime_error("Training data is empty");
-        }
+        Matrix X_train, X_test;
+        Vector y_train, y_test;
 
-        Dataset test_data = load_csv(config.test_path, config.target_name);
-        if (test_data.X.empty()) {
-            throw std::runtime_error("Test data is empty");
+        if (config.train_path == config.test_path) {
+            Dataset data = load_csv(config.train_path, config.target_name);
+            if (data.X.empty()) {
+                throw std::runtime_error("Data is empty");
+            }
+
+            TrainTestSplit split = train_test_split(data.X, data.y);
+            X_train = split.X_train;
+            y_train = split.y_train;
+            X_test = split.X_test;
+            y_test = split.y_test;
+        } else {
+            Dataset train_data = load_csv(config.train_path, config.target_name);
+            if (train_data.X.empty()) {
+                throw std::runtime_error("Training data is empty");
+            }
+
+            Dataset test_data = load_csv(config.test_path, config.target_name);
+            if (test_data.X.empty()) {
+                throw std::runtime_error("Test data is empty");
+            }
+
+            X_train = train_data.X;
+            y_train = train_data.y;
+            X_test = test_data.X;
+            y_test = test_data.y;
         }
-        
-        Matrix X_train = train_data.X;
-        Vector y_train = train_data.y;
-        Matrix X_test = test_data.X;
-        Vector y_test = test_data.y;
 
         if (config.normalize) {
             NormStats stats = zscore_normalize(X_train);
