@@ -114,9 +114,14 @@
   (let* (
          (x-train (getf data :x-class-train))
          (y-train (getf data :y-class-train))
-         (x-test  (getf data :x-class-test))
-         (y-test  (getf data :y-class-test))
          
+         ;; Renaming original full lists so we can slice them
+         (x-full  (getf data :x-class-test))
+         (y-full  (getf data :y-class-test))
+
+         (x-test (subseq x-full 0 (min (length x-full) 100)))
+         (y-test (subseq y-full 0 (min (length y-full) 100)))
+
          ;; --- DEFINE VARIABLES (Init to 0/nil) ---
          (start 0) 
          (end 0) 
