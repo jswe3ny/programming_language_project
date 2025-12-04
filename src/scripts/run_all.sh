@@ -4,7 +4,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m' 
 
 # Global variables to track state
 DATA_LOADED=0
@@ -12,7 +12,7 @@ CURRENT_IMPL=""
 RESULTS_FILE="results.txt"
 SELECTED_FILE=""
 
-# Clear results file on start
+
 > "$RESULTS_FILE"
 
 # Function to validate numeric input
@@ -59,7 +59,7 @@ load_data() {
     echo -e "\n${YELLOW}Loading and cleaning input data set:${NC}"
     echo "************************************"
 
-    # Get available datasets
+  
     if ! scan_data_folder; then
         return 1
     fi
@@ -584,3 +584,4 @@ check_dependencies() {
 # Start the script
 check_dependencies
 main_menu
+
