@@ -2,6 +2,7 @@
 #include <iomanip>
 #include <chrono>
 #include <stdexcept>
+#include <fstream> 
 #include "utils/utils.h"
 #include "utils/metrics.h"
 #include "algos/linear_regression.h"
@@ -22,6 +23,24 @@ struct CliConfig {
     double l2 = 0.0;
     bool normalize = false;
 };
+
+// Helper to count non-empty, non-comment lines
+int get_sloc(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) return 0;
+    
+    int count = 0;
+    std::string line;
+    while (std::getline(file, line)) {
+        size_t first = line.find_first_not_of(" \t");
+        if (first != std::string::npos) {
+            if (line.substr(first, 2) != "//") {
+                count++;
+            }
+        }
+    }
+    return count;
+}
 
 void print_usage() {
     std::cerr << "Usage: program [OPTIONS]\n\n";
@@ -207,13 +226,25 @@ int main(int argc, char* argv[]) {
         std::cout << "Algorithm: " << config.algo << "\n";
         std::cout << "Train time: " << elapsed.count() << " seconds\n";
         
+        // --- Calculate SLOC ---
+        std::string algo_file;
+        if (config.algo == "linear") algo_file = "algos/linear_regression.cpp";
+        else if (config.algo == "logistic") algo_file = "algos/logistic_regression.cpp";
+        else if (config.algo == "knn") algo_file = "algos/knn.cpp";
+        else if (config.algo == "tree") algo_file = "algos/decision_tree.cpp";
+        else if (config.algo == "nb") algo_file = "algos/naive_bayes.cpp";
+
+        int sloc = get_sloc(algo_file);
+        // -----------------------
+
         if (is_classification_algo(config.algo)) {
             std::cout << "Test Accuracy: " << accuracy(y_test, predictions) << "\n";
             std::cout << "Macro-F1: " << macro_f1(y_test, predictions) << "\n";
         } else {
             std::cout << "RMSE: " << rmse(y_test, predictions) << "\n";
-            std::cout << "R²: " << r2_score(y_test, predictions) << "\n";
+            std::cout << "R^2: " << r2_score(y_test, predictions) << "\n";
         }
+        std::cout << "SLOC: " << sloc << "\n";
         
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
