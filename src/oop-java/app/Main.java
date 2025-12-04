@@ -50,7 +50,7 @@ public class Main {
         }
     }
 
-    // --- Helper to ensure data is loaded before running algorithms ---
+    // Helper to ensure data is loaded before running algorithms 
     private static void ensureDataLoaded(ArgParser ap) throws Exception {
         if (TRAIN == null) {
             loadData(ap);
@@ -59,10 +59,9 @@ public class Main {
 
     private static void loadData(ArgParser ap) throws Exception {
         String path = ap.get("train", "../data/adult_income_cleaned.csv");
-        boolean normalize = ap.has("normalize");
+        boolean normalize = ap.has("normalize"); // pass --normalize to enable
         System.out.println("Loading "+path+" (normalize="+normalize+") ...");
         long t0 = System.nanoTime();
-        // Uses the classification loader by default for options 3,4,5,6
         Dataset.TrainTest tt = AdultPipeline.loadClassification(path, "income", normalize, 0.2, 42);
         TRAIN = tt.train; TEST = tt.test;
         double secs = (System.nanoTime()-t0)/1e9;
