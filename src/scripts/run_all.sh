@@ -15,10 +15,26 @@ SELECTED_FILE=""
 
 > "$RESULTS_FILE"
 
-# Function to validate numeric input
+# Function to validate menu integers
 validate_number() {
     if [[ ! "$1" =~ ^[0-9]+$ ]]; then
         echo -e "${RED}Error: Invalid input. Please enter a number.${NC}"
+        return 1
+    fi
+    return 0
+}
+
+# Function to validate algorithm parameters 
+validate_param() {
+    local input=$1
+    # If input is empty, use default 
+    if [ -z "$input" ]; then
+        return 0
+    fi
+    
+    # Check for valid number 
+    if [[ ! "$input" =~ ^[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$ ]]; then
+        echo -e "${RED}Error: '$input' is not a valid numeric value.${NC}"
         return 1
     fi
     return 0
@@ -100,8 +116,6 @@ try:
             # Filter rows that exist but are not in valid list
             invalid_mask = ~income_df[col].isin(valid_list)
             if invalid_mask.any():
-                # Option: Raise error, or just drop them. 
-                # For this pipeline, let's drop them to ensure clean data for C++/Java
                 print(f"Dropping {invalid_mask.sum()} rows with invalid values in {col}")
                 income_df = income_df[~invalid_mask]
 
@@ -225,6 +239,7 @@ run_linear_regression() {
     target=${target:-hours.per.week}
 
     read -p "L2 regularization [0.1]: " l2
+    if ! validate_param "$l2"; then return 1; fi
     l2=${l2:-0.1}
 
     echo -e "\n${BLUE}Outputs:${NC}"
@@ -276,8 +291,12 @@ run_linear_regression() {
     local r2=$(grep -i "R\^2\|R²" /tmp/output.txt | tail -1 | awk '{print $NF}')
     local sloc=$(grep -i "SLOC" /tmp/output.txt | tail -1 | awk '{print $NF}')
 
-    # Log results
-    echo "$CURRENT_IMPL,Linear Regression,$elapsed,$rmse,$r2,$sloc" >> "$RESULTS_FILE"
+    # Log the results only if run was successful 
+    if [ -z "$rmse" ] || [ -z "$r2" ]; then
+        echo -e "${RED}Run failed.${NC}"
+    else
+        echo "$CURRENT_IMPL,Linear Regression,$elapsed,$rmse,$r2,$sloc" >> "$RESULTS_FILE"
+    fi
 }
 
 # Function to run Logistic Regression
@@ -294,15 +313,19 @@ run_logistic_regression() {
     target=${target:-income}
 
     read -p "Learning rate [0.2]: " lr
+    if ! validate_param "$lr"; then return 1; fi
     lr=${lr:-0.2}
 
     read -p "Epochs [400]: " epochs
+    if ! validate_param "$epochs"; then return 1; fi
     epochs=${epochs:-400}
 
     read -p "L2 regularization [0.003]: " l2
+    if ! validate_param "$l2"; then return 1; fi
     l2=${l2:-0.003}
 
     read -p "Random seed [7]: " seed
+    if ! validate_param "$seed"; then return 1; fi
     seed=${seed:-7}
 
     echo -e "\n${BLUE}Outputs:${NC}"
@@ -354,8 +377,12 @@ run_logistic_regression() {
     local f1=$(grep -i "Macro-F1\|F1" /tmp/output.txt | tail -1 | awk '{print $NF}')
     local sloc=$(grep -i "SLOC" /tmp/output.txt | tail -1 | awk '{print $NF}')
 
-    # Log results
-    echo "$CURRENT_IMPL,Logistic Regression,$elapsed,$acc,$f1,$sloc" >> "$RESULTS_FILE"
+    # Log results only if metrics exist
+    if [ -z "$acc" ]; then
+        echo -e "${RED}Run failed.${NC}"
+    else
+        echo "$CURRENT_IMPL,Logistic Regression,$elapsed,$acc,$f1,$sloc" >> "$RESULTS_FILE"
+    fi
 }
 
 # Function to run k-Nearest Neighbors
@@ -369,6 +396,7 @@ run_knn() {
     echo "********************"
 
     read -p "Number of neighbors (k) [5]: " k
+    if ! validate_param "$k"; then return 1; fi
     k=${k:-5}
 
     echo -e "\n${BLUE}Outputs:${NC}"
@@ -415,7 +443,11 @@ run_knn() {
     local f1=$(grep -i "Macro-F1" /tmp/output.txt | tail -1 | awk '{print $NF}')
     local sloc=$(grep -i "SLOC" /tmp/output.txt | tail -1 | awk '{print $NF}')
 
-    echo "$CURRENT_IMPL,k-Nearest Neighbors,$elapsed,$acc,$f1,$sloc" >> "$RESULTS_FILE"
+    if [ -z "$acc" ]; then
+        echo -e "${RED}Run failed.${NC}"
+    else
+        echo "$CURRENT_IMPL,k-Nearest Neighbors,$elapsed,$acc,$f1,$sloc" >> "$RESULTS_FILE"
+    fi
 }
 
 # Function to run Decision Tree
@@ -429,9 +461,11 @@ run_decision_tree() {
     echo "********************"
 
     read -p "Max depth [5]: " depth
+    if ! validate_param "$depth"; then return 1; fi
     depth=${depth:-5}
 
     read -p "Number of bins [10]: " bins
+    if ! validate_param "$bins"; then return 1; fi
     bins=${bins:-10}
 
     echo -e "\n${BLUE}Outputs:${NC}"
@@ -481,7 +515,11 @@ run_decision_tree() {
     local f1=$(grep -i "Macro-F1" /tmp/output.txt | tail -1 | awk '{print $NF}')
     local sloc=$(grep -i "SLOC" /tmp/output.txt | tail -1 | awk '{print $NF}')
 
-    echo "$CURRENT_IMPL,Decision Tree,$elapsed,$acc,$f1,$sloc" >> "$RESULTS_FILE"
+    if [ -z "$acc" ]; then
+        echo -e "${RED}Run failed.${NC}"
+    else
+        echo "$CURRENT_IMPL,Decision Tree,$elapsed,$acc,$f1,$sloc" >> "$RESULTS_FILE"
+    fi
 }
 
 # Function to run Gaussian Naive Bayes
@@ -495,6 +533,7 @@ run_naive_bayes() {
     echo "*********************"
 
     read -p "Variance smoothing [1e-9]: " smooth
+    if ! validate_param "$smooth"; then return 1; fi
     smooth=${smooth:-1e-9}
 
     echo -e "\n${BLUE}Outputs:${NC}"
@@ -540,7 +579,11 @@ run_naive_bayes() {
     local f1=$(grep -i "Macro-F1" /tmp/output.txt | tail -1 | awk '{print $NF}')
     local sloc=$(grep -i "SLOC" /tmp/output.txt | tail -1 | awk '{print $NF}')
 
-    echo "$CURRENT_IMPL,Gaussian Naive Bayes,$elapsed,$acc,$f1,$sloc" >> "$RESULTS_FILE"
+    if [ -z "$acc" ]; then
+        echo -e "${RED}Run failed.${NC}"
+    else
+        echo "$CURRENT_IMPL,Gaussian Naive Bayes,$elapsed,$acc,$f1,$sloc" >> "$RESULTS_FILE"
+    fi
 }
 
 # Function to print implementation results
@@ -694,5 +737,3 @@ check_dependencies() {
 # Start the script
 check_dependencies
 main_menu
-
-
