@@ -114,10 +114,6 @@ except Exception as e:
 EOF
 }
 
-# ==============================================================================
-# EXISTING BASH LOGIC
-# ==============================================================================
-
 # Function to scan data folder and populate global array
 declare -a DATASETS
 scan_data_folder() {
@@ -166,13 +162,10 @@ load_data() {
 
     local RAW_FILE="${DATASETS[$((choice-1))]}"
     
-    # Check if python3 and pandas are available
     if command -v python3 &> /dev/null; then
         # Generate the Python script
         create_cleaner_script
-        
-        # Determine clean filename (e.g., input.csv -> input_cleaned.csv)
-        # If it's already named _cleaned, don't double clean it
+
         if [[ "$RAW_FILE" == *"_cleaned.csv" ]]; then
              SELECTED_FILE="$RAW_FILE"
              echo -e "${GREEN}File appears to be pre-cleaned. Using: $SELECTED_FILE${NC}"
@@ -183,8 +176,7 @@ load_data() {
             echo -e "${YELLOW}Attempting to run Python pre-processing on $RAW_FILE...${NC}"
             
             python3 clean_data.py --input "../data/$RAW_FILE" --output "../data/$CLEAN_NAME"
-            
-            # Check exit code of python script
+
             if [ $? -eq 0 ]; then
                 SELECTED_FILE="$CLEAN_NAME"
                 echo -e "${GREEN}Data cleaned successfully! Using: $SELECTED_FILE${NC}"
@@ -193,7 +185,6 @@ load_data() {
                 echo -e "${RED}Preprocessing failed or not applicable. Falling back to: $SELECTED_FILE${NC}"
             fi
             
-            # Remove temp script
             rm -f clean_data.py
         fi
     else
@@ -703,3 +694,4 @@ check_dependencies() {
 # Start the script
 check_dependencies
 main_menu
+
