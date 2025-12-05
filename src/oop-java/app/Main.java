@@ -25,8 +25,6 @@ public class Main {
                 } catch (NumberFormatException e) {
                     continue;
                 }
-                System.out.println("DEBUG: processing option " + opt);
-                System.out.flush();
 
                 if(opt==8) return;
 
@@ -40,8 +38,6 @@ public class Main {
                 if(opt==5) runTree(ap);
                 if(opt==6) runGNB(ap);
                 if(opt==7) printResults();
-
-                System.out.flush();
             }
 
         } catch (Exception e) {
@@ -106,13 +102,8 @@ public class Main {
     }
 
     private static void runLogistic(ArgParser ap){
-        System.out.println("DEBUG");
-        System.out.flush();
-
         // Ensure data is loaded
         try { ensureDataLoaded(ap); } catch (Exception e) { System.out.println(e.getMessage()); return; }
-
-        System.out.println("DEBUG: Data");
 
         double lr = ap.getDouble("lr", 0.001);
         int epochs = ap.getInt("epochs", 3000);
@@ -120,20 +111,14 @@ public class Main {
         long seed = 7;
         String srcRoot = ap.get("srcroot", ".");
 
-        System.out.printf("DEBUG: lr=%.4f, epochs=%d, l2=%.4f%n", lr, epochs, l2);
-        System.out.flush();
-
         try {
 
             Timer t = new Timer();
             t.start();
             LogisticRegression m = new LogisticRegression(lr, epochs, l2, seed);
 
-            System.out.println("DEBUG: Staring fit");
             m.fit(TRAIN);
             double secs = t.seconds();
-            System.out.println("DEBUG: fit complete");
-
             double[] pred = m.predict(TEST.X);
             double acc = Metrics.accuracy(TEST.y, pred);
             double f1  = Metrics.macroF1(TEST.y, pred);
@@ -148,7 +133,6 @@ public class Main {
             System.out.printf("Accuracy: %.4f%n", acc);
             System.out.printf("Macro-F1: %.4f%n", f1);
             System.out.println("SLOC: " + sloc + "\n");
-            System.out.flush();
             log(m.name(), secs, "Accuracy", acc, "Macro-F1", f1, sloc);
         } catch (Exception e) {
             System.out.println("Error in run Logsitic: " + e.getMessage());
