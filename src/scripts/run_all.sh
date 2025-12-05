@@ -4,7 +4,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' 
+NC='\033[0m'
 
 # Global variables to track state
 DATA_LOADED=0
@@ -24,15 +24,15 @@ validate_number() {
     return 0
 }
 
-# Function to validate algorithm parameters 
+# Function to validate algorithm parameters
 validate_param() {
     local input=$1
-    # If input is empty, use default 
+    # If input is empty, use default
     if [ -z "$input" ]; then
         return 0
     fi
-    
-    # Check for valid number 
+
+    # Check for valid number
     if [[ ! "$input" =~ ^[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$ ]]; then
         echo -e "${RED}Error: '$input' is not a valid numeric value.${NC}"
         return 1
@@ -65,7 +65,7 @@ output_file = args.output
 
 try:
     income_df = pd.read_csv(input_file)
-    
+
     # Check if this looks like the adult income dataset before proceeding
     required_cols = ['age', 'workclass', 'education', 'occupation', 'income']
     if not all(col in income_df.columns for col in required_cols):
@@ -76,9 +76,9 @@ try:
     seen = set()
 
     # Cast to string where appropriate
-    str_cols = ['workclass', 'education', 'marital.status', 'occupation', 
+    str_cols = ['workclass', 'education', 'marital.status', 'occupation',
                 'relationship', 'race', 'sex', 'native.country', 'income']
-    
+
     for col in str_cols:
         if col in income_df.columns:
             income_df[col] = income_df[col].astype('string')
@@ -175,7 +175,7 @@ load_data() {
     fi
 
     local RAW_FILE="${DATASETS[$((choice-1))]}"
-    
+
     if command -v python3 &> /dev/null; then
         # Generate the Python script
         create_cleaner_script
@@ -186,9 +186,9 @@ load_data() {
         else
             local BASE_NAME="${RAW_FILE%.*}"
             local CLEAN_NAME="${BASE_NAME}_cleaned.csv"
-            
+
             echo -e "${YELLOW}Attempting to run Python pre-processing on $RAW_FILE...${NC}"
-            
+
             python3 clean_data.py --input "../data/$RAW_FILE" --output "../data/$CLEAN_NAME"
 
             if [ $? -eq 0 ]; then
@@ -198,7 +198,7 @@ load_data() {
                 SELECTED_FILE="$RAW_FILE"
                 echo -e "${RED}Preprocessing failed or not applicable. Falling back to: $SELECTED_FILE${NC}"
             fi
-            
+
             rm -f clean_data.py
         fi
     else
@@ -278,7 +278,7 @@ run_linear_regression() {
             ;;
         "Lisp")
             cd ../fp
-            sbcl --script main.lisp --algo linear --train "$DATA_PATH" --l2 "$l2" 2>&1 | tee /tmp/output.txt
+            sbcl --script main.lisp --algo linear --train "$DATA_PATH" --target "$target" --l2 "$l2" 2>&1 | tee /tmp/output.txt
             cd ../scripts
             ;;
     esac
@@ -291,7 +291,7 @@ run_linear_regression() {
     local r2=$(grep -i "R\^2\|R²" /tmp/output.txt | tail -1 | awk '{print $NF}')
     local sloc=$(grep -i "SLOC" /tmp/output.txt | tail -1 | awk '{print $NF}')
 
-    # Log the results only if run was successful 
+    # Log the results only if run was successful
     if [ -z "$rmse" ] || [ -z "$r2" ]; then
         echo -e "${RED}Run failed.${NC}"
     else
@@ -356,14 +356,14 @@ run_logistic_regression() {
             cd ../oop-java
             echo "Compiling Java implementation..."
             javac $(find . -name "*.java") > /dev/null 2>&1
-            printf "1\n3\n" | stdbuf -oL java app.Main --train "$DATA_PATH" --normalize --lr "$lr" --epochs "$epochs" --l2 "$l2" --seed "$seed" 2>&1 | tee /tmp/output.txt
+            printf "1\n3\n" | stdbuf -oL java app.Main --train "$DATA_PATH" --target "$target" --normalize --lr "$lr" --epochs "$epochs" --l2 "$l2" --seed "$seed" 2>&1 | tee /tmp/output.txt
 
             cd ../scripts
             ;;
         "Lisp")
             cd ../fp
             sbcl --script main.lisp --algo logistic \
-                 --train "$DATA_PATH" \
+                 --train "$DATA_PATH" --target "$target" \
                  --lr "$lr" --epochs "$epochs" --l2 "$l2" 2>&1 | tee /tmp/output.txt
             cd ../scripts
             ;;
@@ -413,7 +413,7 @@ run_knn() {
             fi
             ./program --train "$DATA_PATH" \
                      --test "$DATA_PATH" \
-                     --target income \
+                     --target "$target" \
                      --algo knn \
                      --k "$k" \
                      --normalize 2>&1 | tee /tmp/output.txt
@@ -424,14 +424,14 @@ run_knn() {
             if [ ! -f "app/Main.class" ]; then
                 javac $(find . -name "*.java") > /dev/null 2>&1
             fi
-            echo "4" | java app.Main --train "$DATA_PATH" \
+            echo "4" | java app.Main --train "$DATA_PATH" --target "$target" \
                                     --normalize \
                                     --k "$k" 2>&1 | tee /tmp/output.txt
             cd ../scripts
             ;;
         "Lisp")
             cd ../fp
-            sbcl --script main.lisp --algo knn --train "$DATA_PATH" --k "$k" 2>&1 | tee /tmp/output.txt
+            sbcl --script main.lisp --algo knn --target "$target" --train "$DATA_PATH" --k "$k" 2>&1 | tee /tmp/output.txt
             cd ../scripts
             ;;
     esac
@@ -482,7 +482,7 @@ run_decision_tree() {
             fi
             ./program --train "$DATA_PATH" \
                      --test "$DATA_PATH" \
-                     --target income \
+                     --target "$target" \
                      --algo tree \
                      --max_depth "$depth" \
                      --normalize 2>&1 | tee /tmp/output.txt
@@ -493,7 +493,7 @@ run_decision_tree() {
             if [ ! -f "app/Main.class" ]; then
                 javac $(find . -name "*.java") > /dev/null 2>&1
             fi
-            echo "5" | java app.Main --train "$DATA_PATH" \
+            echo "5" | java app.Main --train "$DATA_PATH" --target "$target" \
                                     --normalize \
                                     --max_depth "$depth" \
                                     --bins "$bins" 2>&1 | tee /tmp/output.txt
@@ -502,7 +502,7 @@ run_decision_tree() {
         "Lisp")
             cd ../fp
             sbcl --script main.lisp --algo tree \
-                 --train "$DATA_PATH" \
+                 --train "$DATA_PATH" --target "$target" \
                  --max_depth "$depth" --n_bins "$bins" 2>&1 | tee /tmp/output.txt
             cd ../scripts
             ;;
@@ -567,7 +567,7 @@ run_naive_bayes() {
             ;;
         "Lisp")
             cd ../fp
-            sbcl --script main.lisp --algo nb --train "$DATA_PATH" 2>&1 | tee /tmp/output.txt
+            sbcl --script main.lisp --algo nb --train "$DATA_PATH" --smoothing "$smooth" 2>&1 | tee /tmp/output.txt
             cd ../scripts
             ;;
     esac
