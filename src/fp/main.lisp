@@ -142,7 +142,8 @@
     (setf time (/ (- end start) internal-time-units-per-second))
 
     (format t "Train time: ~,4f seconds~%" time)
-    (format t "KNN Accuracy: ~5f~%" (calc-accuracy preds y-test))
+    (format t "Metric 1 Accuracy: ~5f~%" (calc-accuracy preds y-test))
+    (format t "Metric 2 Macro-F1: ~5f~%" (calc-macro-f1 preds y-test))
     (format t "Metric 3 SLOC: ~a~%" (get-sloc "knn.lisp"))
 
     
