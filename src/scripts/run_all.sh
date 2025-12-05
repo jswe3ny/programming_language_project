@@ -224,8 +224,8 @@ run_linear_regression() {
     read -p "Target variable [hours.per.week]: " target
     target=${target:-hours.per.week}
 
-    read -p "L2 regularization [0]: " l2
-    l2=${l2:-0}
+    read -p "L2 regularization [0.1]: " l2
+    l2=${l2:-0.1}
 
     echo -e "\n${BLUE}Outputs:${NC}"
     echo "*******"
@@ -694,4 +694,5 @@ check_dependencies() {
 # Start the script
 check_dependencies
 main_menu
+
 
