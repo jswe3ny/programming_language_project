@@ -65,7 +65,7 @@ output_file = args.output
 
 try:
     income_df = pd.read_csv(input_file)
-    
+
     if income_df.columns[0] == '' or 'Unnamed' in str(income_df.columns[0]):
         income_df = income_df.iloc[:, 1:]
 
@@ -187,8 +187,8 @@ load_data() {
         create_cleaner_script
 
         if [[ "$RAW_FILE" == *"_cleaned.csv" ]]; then
-             SELECTED_FILE="$RAW_FILE"
-             echo -e "${GREEN}File appears to be pre-cleaned. Using: $SELECTED_FILE${NC}"
+            SELECTED_FILE="$RAW_FILE"
+            echo -e "${GREEN}File appears to be pre-cleaned. Using: $SELECTED_FILE${NC}"
         else
             local BASE_NAME="${RAW_FILE%.*}"
             local CLEAN_NAME="${BASE_NAME}_cleaned.csv"
@@ -201,8 +201,11 @@ load_data() {
                 SELECTED_FILE="$CLEAN_NAME"
                 echo -e "${GREEN}Data cleaned successfully! Using: $SELECTED_FILE${NC}"
             else
-                SELECTED_FILE="$RAW_FILE"
-                echo -e "${RED}Preprocessing failed or not applicable. Falling back to: $SELECTED_FILE${NC}"
+                echo -e "${RED}ERROR: Data cleaning failed.${NC}"
+                echo -e "${RED}Cannot proceed with file: $RAW_FILE${NC}"
+                rm -f clean_data.py
+                DATA_LOADED=0
+                return 1
             fi
 
             rm -f clean_data.py
@@ -263,34 +266,34 @@ run_linear_regression() {
                 make clean && make -j4 > /dev/null 2>&1
             fi
             ./program --train "$DATA_PATH" \
-                     --test "$DATA_PATH" \
-                     --target "$target" \
-                     --algo linear \
-                     --l2 "$l2" \
-                     --normalize 2>&1 | tee /tmp/output.txt
-            cd ../scripts
-            ;;
-        "Java")
-            cd ../oop-java
-            if [ ! -f "app/Main.class" ]; then
-                echo "Compiling Java implementation..."
-                javac $(find . -name "*.java")
-            fi
-            echo "2" | java app.Main --train "$DATA_PATH" \
-                                    --normalize \
-                                    --target "$target" \
-                                    --l2 "$l2" 2>&1 | tee /tmp/output.txt
-            cd ../scripts
-            ;;
-        "Lisp")
-            cd ../fp
-            sbcl --script main.lisp --algo linear --train "$DATA_PATH" --target "$target" --l2 "$l2" 2>&1 | tee /tmp/output.txt
-            cd ../scripts
-            ;;
-    esac
+                --test "$DATA_PATH" \
+                --target "$target" \
+                --algo linear \
+                --l2 "$l2" \
+                --normalize 2>&1 | tee /tmp/output.txt
+                            cd ../scripts
+                            ;;
+                        "Java")
+                            cd ../oop-java
+                            if [ ! -f "app/Main.class" ]; then
+                                echo "Compiling Java implementation..."
+                                javac $(find . -name "*.java")
+                            fi
+                            echo "2" | java app.Main --train "$DATA_PATH" \
+                                --normalize \
+                                --target "$target" \
+                                --l2 "$l2" 2>&1 | tee /tmp/output.txt
+                                                            cd ../scripts
+                                                            ;;
+                                                        "Lisp")
+                                                            cd ../fp
+                                                            sbcl --script main.lisp --algo linear --train "$DATA_PATH" --target "$target" --l2 "$l2" 2>&1 | tee /tmp/output.txt
+                                                            cd ../scripts
+                                                            ;;
+                                                    esac
 
-    local end_time=$(date +%s.%N)
-    local elapsed=$(echo "$end_time - $start_time" | bc)
+                                                    local end_time=$(date +%s.%N)
+                                                    local elapsed=$(echo "$end_time - $start_time" | bc)
 
     # Extract metrics from output
     local rmse=$(grep -i "RMSE" /tmp/output.txt | tail -1 | awk '{print $NF}')
@@ -349,34 +352,34 @@ run_logistic_regression() {
                 make clean && make -j4 > /dev/null 2>&1
             fi
             ./program --train "$DATA_PATH" \
-                     --test "$DATA_PATH" \
-                     --target "$target" \
-                     --algo logistic \
-                     --lr "$lr" \
-                     --epochs "$epochs" \
-                     --l2 "$l2" \
-                     --normalize 2>&1 | tee /tmp/output.txt
-            cd ../scripts
-            ;;
-        "Java")
-            cd ../oop-java
-            echo "Compiling Java implementation..."
-            javac $(find . -name "*.java") > /dev/null 2>&1
-            printf "1\n3\n" | stdbuf -oL java app.Main --train "$DATA_PATH" --target "$target" --normalize --lr "$lr" --epochs "$epochs" --l2 "$l2" --seed "$seed" 2>&1 | tee /tmp/output.txt
+                --test "$DATA_PATH" \
+                --target "$target" \
+                --algo logistic \
+                --lr "$lr" \
+                --epochs "$epochs" \
+                --l2 "$l2" \
+                --normalize 2>&1 | tee /tmp/output.txt
+                            cd ../scripts
+                            ;;
+                        "Java")
+                            cd ../oop-java
+                            echo "Compiling Java implementation..."
+                            javac $(find . -name "*.java") > /dev/null 2>&1
+                            printf "1\n3\n" | stdbuf -oL java app.Main --train "$DATA_PATH" --target "$target" --normalize --lr "$lr" --epochs "$epochs" --l2 "$l2" --seed "$seed" 2>&1 | tee /tmp/output.txt
 
-            cd ../scripts
-            ;;
-        "Lisp")
-            cd ../fp
-            sbcl --script main.lisp --algo logistic \
-                 --train "$DATA_PATH" --target "$target" \
-                 --lr "$lr" --epochs "$epochs" --l2 "$l2" 2>&1 | tee /tmp/output.txt
-            cd ../scripts
-            ;;
-    esac
+                            cd ../scripts
+                            ;;
+                        "Lisp")
+                            cd ../fp
+                            sbcl --script main.lisp --algo logistic \
+                                --train "$DATA_PATH" --target "$target" \
+                                --lr "$lr" --epochs "$epochs" --l2 "$l2" 2>&1 | tee /tmp/output.txt
+                                                            cd ../scripts
+                                                            ;;
+                                                    esac
 
-    local end_time=$(date +%s.%N)
-    local elapsed=$(echo "$end_time - $start_time" | bc)
+                                                    local end_time=$(date +%s.%N)
+                                                    local elapsed=$(echo "$end_time - $start_time" | bc)
 
     # Extract metrics
     local acc=$(grep -i "Accuracy" /tmp/output.txt | tail -1 | awk '{print $NF}')
@@ -418,43 +421,43 @@ run_knn() {
                 make clean && make -j4 > /dev/null 2>&1
             fi
             ./program --train "$DATA_PATH" \
-                     --test "$DATA_PATH" \
-                     --target "$target" \
-                     --algo knn \
-                     --k "$k" \
-                     --normalize 2>&1 | tee /tmp/output.txt
-            cd ../scripts
-            ;;
-        "Java")
-            cd ../oop-java
-            if [ ! -f "app/Main.class" ]; then
-                javac $(find . -name "*.java") > /dev/null 2>&1
-            fi
-            echo "4" | java app.Main --train "$DATA_PATH" --target "$target" \
-                                    --normalize \
-                                    --k "$k" 2>&1 | tee /tmp/output.txt
-            cd ../scripts
-            ;;
-        "Lisp")
-            cd ../fp
-            sbcl --script main.lisp --algo knn --target "$target" --train "$DATA_PATH" --k "$k" 2>&1 | tee /tmp/output.txt
-            cd ../scripts
-            ;;
-    esac
+                --test "$DATA_PATH" \
+                --target "$target" \
+                --algo knn \
+                --k "$k" \
+                --normalize 2>&1 | tee /tmp/output.txt
+                            cd ../scripts
+                            ;;
+                        "Java")
+                            cd ../oop-java
+                            if [ ! -f "app/Main.class" ]; then
+                                javac $(find . -name "*.java") > /dev/null 2>&1
+                            fi
+                            echo "4" | java app.Main --train "$DATA_PATH" --target "$target" \
+                                --normalize \
+                                --k "$k" 2>&1 | tee /tmp/output.txt
+                                                            cd ../scripts
+                                                            ;;
+                                                        "Lisp")
+                                                            cd ../fp
+                                                            sbcl --script main.lisp --algo knn --target "$target" --train "$DATA_PATH" --k "$k" 2>&1 | tee /tmp/output.txt
+                                                            cd ../scripts
+                                                            ;;
+                                                    esac
 
-    local end_time=$(date +%s.%N)
-    local elapsed=$(echo "$end_time - $start_time" | bc)
+                                                    local end_time=$(date +%s.%N)
+                                                    local elapsed=$(echo "$end_time - $start_time" | bc)
 
-    local acc=$(grep -i "Accuracy" /tmp/output.txt | tail -1 | awk '{print $NF}')
-    local f1=$(grep -i "Macro-F1" /tmp/output.txt | tail -1 | awk '{print $NF}')
-    local sloc=$(grep -i "SLOC" /tmp/output.txt | tail -1 | awk '{print $NF}')
+                                                    local acc=$(grep -i "Accuracy" /tmp/output.txt | tail -1 | awk '{print $NF}')
+                                                    local f1=$(grep -i "Macro-F1" /tmp/output.txt | tail -1 | awk '{print $NF}')
+                                                    local sloc=$(grep -i "SLOC" /tmp/output.txt | tail -1 | awk '{print $NF}')
 
-    if [ -z "$acc" ]; then
-        echo -e "${RED}Run failed.${NC}"
-    else
-        echo "$CURRENT_IMPL,k-Nearest Neighbors,$elapsed,$acc,$f1,$sloc" >> "$RESULTS_FILE"
-    fi
-}
+                                                    if [ -z "$acc" ]; then
+                                                        echo -e "${RED}Run failed.${NC}"
+                                                    else
+                                                        echo "$CURRENT_IMPL,k-Nearest Neighbors,$elapsed,$acc,$f1,$sloc" >> "$RESULTS_FILE"
+                                                    fi
+                                                }
 
 # Function to run Decision Tree
 run_decision_tree() {
@@ -487,46 +490,46 @@ run_decision_tree() {
                 make clean && make -j4 > /dev/null 2>&1
             fi
             ./program --train "$DATA_PATH" \
-                     --test "$DATA_PATH" \
-                     --target "$target" \
-                     --algo tree \
-                     --max_depth "$depth" \
-                     --normalize 2>&1 | tee /tmp/output.txt
-            cd ../scripts
-            ;;
-        "Java")
-            cd ../oop-java
-            if [ ! -f "app/Main.class" ]; then
-                javac $(find . -name "*.java") > /dev/null 2>&1
-            fi
-            echo "5" | java app.Main --train "$DATA_PATH" --target "$target" \
-                                    --normalize \
-                                    --max_depth "$depth" \
-                                    --bins "$bins" 2>&1 | tee /tmp/output.txt
-            cd ../scripts
-            ;;
-        "Lisp")
-            cd ../fp
-            sbcl --script main.lisp --algo tree \
-                 --train "$DATA_PATH" --target "$target" \
-                 --max_depth "$depth" --n_bins "$bins" 2>&1 | tee /tmp/output.txt
-            cd ../scripts
-            ;;
-    esac
+                --test "$DATA_PATH" \
+                --target "$target" \
+                --algo tree \
+                --max_depth "$depth" \
+                --normalize 2>&1 | tee /tmp/output.txt
+                            cd ../scripts
+                            ;;
+                        "Java")
+                            cd ../oop-java
+                            if [ ! -f "app/Main.class" ]; then
+                                javac $(find . -name "*.java") > /dev/null 2>&1
+                            fi
+                            echo "5" | java app.Main --train "$DATA_PATH" --target "$target" \
+                                --normalize \
+                                --max_depth "$depth" \
+                                --bins "$bins" 2>&1 | tee /tmp/output.txt
+                                                            cd ../scripts
+                                                            ;;
+                                                        "Lisp")
+                                                            cd ../fp
+                                                            sbcl --script main.lisp --algo tree \
+                                                                --train "$DATA_PATH" --target "$target" \
+                                                                --max_depth "$depth" --n_bins "$bins" 2>&1 | tee /tmp/output.txt
+                                                                                                                            cd ../scripts
+                                                                                                                            ;;
+                                                                                                                    esac
 
-    local end_time=$(date +%s.%N)
-    local elapsed=$(echo "$end_time - $start_time" | bc)
+                                                                                                                    local end_time=$(date +%s.%N)
+                                                                                                                    local elapsed=$(echo "$end_time - $start_time" | bc)
 
-    local acc=$(grep -i "Accuracy" /tmp/output.txt | tail -1 | awk '{print $NF}')
-    local f1=$(grep -i "Macro-F1" /tmp/output.txt | tail -1 | awk '{print $NF}')
-    local sloc=$(grep -i "SLOC" /tmp/output.txt | tail -1 | awk '{print $NF}')
+                                                                                                                    local acc=$(grep -i "Accuracy" /tmp/output.txt | tail -1 | awk '{print $NF}')
+                                                                                                                    local f1=$(grep -i "Macro-F1" /tmp/output.txt | tail -1 | awk '{print $NF}')
+                                                                                                                    local sloc=$(grep -i "SLOC" /tmp/output.txt | tail -1 | awk '{print $NF}')
 
-    if [ -z "$acc" ]; then
-        echo -e "${RED}Run failed.${NC}"
-    else
-        echo "$CURRENT_IMPL,Decision Tree,$elapsed,$acc,$f1,$sloc" >> "$RESULTS_FILE"
-    fi
-}
+                                                                                                                    if [ -z "$acc" ]; then
+                                                                                                                        echo -e "${RED}Run failed.${NC}"
+                                                                                                                    else
+                                                                                                                        echo "$CURRENT_IMPL,Decision Tree,$elapsed,$acc,$f1,$sloc" >> "$RESULTS_FILE"
+                                                                                                                    fi
+                                                                                                                }
 
 # Function to run Gaussian Naive Bayes
 run_naive_bayes() {
@@ -555,42 +558,42 @@ run_naive_bayes() {
                 make clean && make -j4 > /dev/null 2>&1
             fi
             ./program --train "$DATA_PATH" \
-                     --test "$DATA_PATH" \
-                     --target income \
-                     --algo nb \
-                     --normalize 2>&1 | tee /tmp/output.txt
-            cd ../scripts
-            ;;
-        "Java")
-            cd ../oop-java
-            if [ ! -f "app/Main.class" ]; then
-                javac $(find . -name "*.java") > /dev/null 2>&1
-            fi
-            echo "6" | java app.Main --train "$DATA_PATH" \
-                                    --normalize \
-                                    --smoothing "$smooth" 2>&1 | tee /tmp/output.txt
-            cd ../scripts
-            ;;
-        "Lisp")
-            cd ../fp
-            sbcl --script main.lisp --algo nb --train "$DATA_PATH" --smoothing "$smooth" 2>&1 | tee /tmp/output.txt
-            cd ../scripts
-            ;;
-    esac
+                --test "$DATA_PATH" \
+                --target income \
+                --algo nb \
+                --normalize 2>&1 | tee /tmp/output.txt
+                            cd ../scripts
+                            ;;
+                        "Java")
+                            cd ../oop-java
+                            if [ ! -f "app/Main.class" ]; then
+                                javac $(find . -name "*.java") > /dev/null 2>&1
+                            fi
+                            echo "6" | java app.Main --train "$DATA_PATH" \
+                                --normalize \
+                                --smoothing "$smooth" 2>&1 | tee /tmp/output.txt
+                                                            cd ../scripts
+                                                            ;;
+                                                        "Lisp")
+                                                            cd ../fp
+                                                            sbcl --script main.lisp --algo nb --train "$DATA_PATH" --smoothing "$smooth" 2>&1 | tee /tmp/output.txt
+                                                            cd ../scripts
+                                                            ;;
+                                                    esac
 
-    local end_time=$(date +%s.%N)
-    local elapsed=$(echo "$end_time - $start_time" | bc)
+                                                    local end_time=$(date +%s.%N)
+                                                    local elapsed=$(echo "$end_time - $start_time" | bc)
 
-    local acc=$(grep -i "Accuracy" /tmp/output.txt | tail -1 | awk '{print $NF}')
-    local f1=$(grep -i "Macro-F1" /tmp/output.txt | tail -1 | awk '{print $NF}')
-    local sloc=$(grep -i "SLOC" /tmp/output.txt | tail -1 | awk '{print $NF}')
+                                                    local acc=$(grep -i "Accuracy" /tmp/output.txt | tail -1 | awk '{print $NF}')
+                                                    local f1=$(grep -i "Macro-F1" /tmp/output.txt | tail -1 | awk '{print $NF}')
+                                                    local sloc=$(grep -i "SLOC" /tmp/output.txt | tail -1 | awk '{print $NF}')
 
-    if [ -z "$acc" ]; then
-        echo -e "${RED}Run failed.${NC}"
-    else
-        echo "$CURRENT_IMPL,Gaussian Naive Bayes,$elapsed,$acc,$f1,$sloc" >> "$RESULTS_FILE"
-    fi
-}
+                                                    if [ -z "$acc" ]; then
+                                                        echo -e "${RED}Run failed.${NC}"
+                                                    else
+                                                        echo "$CURRENT_IMPL,Gaussian Naive Bayes,$elapsed,$acc,$f1,$sloc" >> "$RESULTS_FILE"
+                                                    fi
+                                                }
 
 # Function to print implementation results
 print_impl_results() {
@@ -598,20 +601,20 @@ print_impl_results() {
     echo "******************************"
 
     printf "%-8s %-25s %-15s %-16s %-16s %-8s\n" \
-           "Impl" "Algorithm" "TrainTime" "TestMetric1" "TestMetric2" "SLOC"
-    echo "-----------------------------------------------------------------------------------------"
+        "Impl" "Algorithm" "TrainTime" "TestMetric1" "TestMetric2" "SLOC"
+            echo "-----------------------------------------------------------------------------------------"
 
-    if [ -f "$RESULTS_FILE" ]; then
-        while IFS=',' read -r impl algo time m1 m2 sloc; do
-            if [ "$impl" == "$CURRENT_IMPL" ]; then
-                printf "%-8s %-25s %-15s %-16s %-16s %-8s\n" \
-                       "$impl" "$algo" "${time}s" "$m1" "$m2" "$sloc"
+            if [ -f "$RESULTS_FILE" ]; then
+                while IFS=',' read -r impl algo time m1 m2 sloc; do
+                    if [ "$impl" == "$CURRENT_IMPL" ]; then
+                        printf "%-8s %-25s %-15s %-16s %-16s %-8s\n" \
+                            "$impl" "$algo" "${time}s" "$m1" "$m2" "$sloc"
+                    fi
+                done < "$RESULTS_FILE"
+            else
+                echo "No results available yet."
             fi
-        done < "$RESULTS_FILE"
-    else
-        echo "No results available yet."
-    fi
-}
+        }
 
 # Function to print general comparison results
 print_general_results() {
@@ -619,18 +622,18 @@ print_general_results() {
     echo "*****************************"
 
     printf "%-8s %-25s %-15s %-16s %-16s %-8s\n" \
-           "Impl" "Algorithm" "TrainTime" "TestMetric1" "TestMetric2" "SLOC"
-    echo "-----------------------------------------------------------------------------------------"
+        "Impl" "Algorithm" "TrainTime" "TestMetric1" "TestMetric2" "SLOC"
+            echo "-----------------------------------------------------------------------------------------"
 
-    if [ -f "$RESULTS_FILE" ] && [ -s "$RESULTS_FILE" ]; then
-        while IFS=',' read -r impl algo time m1 m2 sloc; do
-            printf "%-8s %-25s %-15s %-16s %-16s %-8s\n" \
-                   "$impl" "$algo" "${time}s" "$m1" "$m2" "$sloc"
-        done < "$RESULTS_FILE"
-    else
-        echo "No results available yet. Please run some algorithms first."
-    fi
-}
+            if [ -f "$RESULTS_FILE" ] && [ -s "$RESULTS_FILE" ]; then
+                while IFS=',' read -r impl algo time m1 m2 sloc; do
+                    printf "%-8s %-25s %-15s %-16s %-16s %-8s\n" \
+                        "$impl" "$algo" "${time}s" "$m1" "$m2" "$sloc"
+                                        done < "$RESULTS_FILE"
+                                    else
+                                        echo "No results available yet. Please run some algorithms first."
+            fi
+        }
 
 # Algorithm menu
 algorithm_menu() {
@@ -743,4 +746,3 @@ check_dependencies() {
 # Start the script
 check_dependencies
 main_menu
-
