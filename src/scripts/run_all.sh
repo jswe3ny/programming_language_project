@@ -65,6 +65,12 @@ output_file = args.output
 
 try:
     income_df = pd.read_csv(input_file)
+    
+    if income_df.columns[0] == '' or 'Unnamed' in str(income_df.columns[0]):
+        income_df = income_df.iloc[:, 1:]
+
+    if len(income_df.columns) != 14:
+        raise ValueError(f"Expected 14 columns, but found {len(income_df.columns)} columns")
 
     # Check if this looks like the adult income dataset before proceeding
     required_cols = ['age', 'workclass', 'education', 'occupation', 'income']
@@ -737,3 +743,4 @@ check_dependencies() {
 # Start the script
 check_dependencies
 main_menu
+
